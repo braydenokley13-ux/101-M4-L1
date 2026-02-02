@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NFL Draft Randomness Lab</title>
+<style>
+/* ===== RESET & BASE ===== */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a1128;--surface:#1a2340;--card:#222e50;--accent:#00c9a7;--accent2:#ff6b6b;
+  --gold:#ffd700;--silver:#c0c0c0;--blue:#4dabf7;--purple:#b197fc;
+  --text:#e8e8e8;--muted:#8899aa;--success:#51cf66;--warn:#fcc419;--danger:#ff6b6b;
+  --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.4);
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+button{cursor:pointer;font-family:inherit;border:none;border-radius:8px;padding:10px 20px;font-weight:600;transition:all .2s}
+button:hover{transform:translateY(-2px);filter:brightness(1.15)}
+button:active{transform:translateY(0)}
+
+/* ===== SCREENS ===== */
+.screen{display:none;animation:fadeIn .4s ease}
+.screen.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* ===== WELCOME SCREEN ===== */
+#welcome{text-align:center;padding:40px 20px;max-width:800px;margin:0 auto}
+#welcome h1{font-size:2.4em;background:linear-gradient(135deg,var(--accent),var(--blue));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+#welcome .subtitle{color:var(--muted);font-size:1.1em;margin-bottom:30px}
+.learning-box{background:var(--surface);border-left:4px solid var(--accent);border-radius:var(--radius);padding:20px 24px;text-align:left;margin:20px 0}
+.learning-box h3{color:var(--accent);margin-bottom:10px;font-size:1.1em}
+.learning-box ul{padding-left:20px;line-height:2}
+.learning-box li{color:var(--text);font-size:.95em}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:24px 0}
+.setup-card{background:var(--card);border-radius:var(--radius);padding:20px;text-align:center;cursor:pointer;border:2px solid transparent;transition:all .25s}
+.setup-card:hover,.setup-card.selected{border-color:var(--accent);background:var(--surface)}
+.setup-card h4{margin-bottom:6px}
+.setup-card p{color:var(--muted);font-size:.85em}
+.scheme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0}
+.scheme-btn{background:var(--card);color:var(--text);padding:12px;font-size:.85em;border:2px solid transparent}
+.scheme-btn.selected{border-color:var(--gold);background:var(--surface);color:var(--gold)}
+.start-btn{background:linear-gradient(135deg,var(--accent),#00b894);color:#000;font-size:1.2em;padding:16px 48px;margin-top:20px;border-radius:50px;letter-spacing:.5px}
+
+/* ===== DRAFT SCREEN ===== */
+#draft-screen{padding:10px}
+.draft-header{background:var(--surface);border-radius:var(--radius);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.draft-header .round-info{font-size:1.3em;font-weight:700}
+.draft-header .round-info span{color:var(--accent)}
+.meters{display:flex;gap:16px;flex-wrap:wrap}
+.meter{min-width:120px}
+.meter label{font-size:.7em;text-transform:uppercase;color:var(--muted);letter-spacing:1px}
+.meter-bar{height:10px;background:#333;border-radius:5px;margin-top:4px;overflow:hidden}
+.meter-fill{height:100%;border-radius:5px;transition:width .6s ease}
+.draft-layout{display:grid;grid-template-columns:1fr 340px;gap:12px;min-height:calc(100vh - 180px)}
+@media(max-width:900px){.draft-layout{grid-template-columns:1fr}.player-detail-panel{max-height:400px;overflow-y:auto}}
+
+/* Board */
+.board-controls{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.board-controls select,.board-controls input{background:var(--card);color:var(--text);border:1px solid #444;border-radius:8px;padding:8px 12px;font-size:.85em}
+.board-controls input{flex:1;min-width:120px}
+.prospect-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;max-height:calc(100vh - 260px);overflow-y:auto;padding-right:4px}
+.prospect-list::-webkit-scrollbar{width:6px}
+.prospect-list::-webkit-scrollbar-thumb{background:var(--accent);border-radius:3px}
+
+/* Player Card */
+.p-card{background:var(--card);border-radius:var(--radius);padding:14px;cursor:pointer;border:2px solid transparent;transition:all .2s;position:relative;overflow:hidden}
+.p-card:hover{border-color:var(--blue);transform:translateY(-3px)}
+.p-card.selected{border-color:var(--accent);box-shadow:0 0 20px rgba(0,201,167,.25)}
+.p-card.drafted{opacity:.35;pointer-events:none}
+.p-card .tier-badge{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.8em}
+.tier-A{background:var(--gold);color:#000}.tier-B{background:var(--blue);color:#000}
+.tier-C{background:var(--silver);color:#000}.tier-D{background:#666;color:#fff}
+.p-card .p-name{font-weight:700;font-size:1em;margin-bottom:2px;padding-right:32px}
+.p-card .p-meta{color:var(--muted);font-size:.78em;margin-bottom:8px}
+.p-card .traits{display:flex;flex-wrap:wrap;gap:4px}
+.trait-tag{font-size:.65em;padding:3px 7px;border-radius:20px;font-weight:600;white-space:nowrap}
+.trait-hf{background:#2d6a4f;color:#b7e4c7}.trait-bb{background:#7b2d8b;color:#e0aaff}
+.trait-ir{background:#9c2a2a;color:#ffc9c9}.trait-raw{background:#5c4d1a;color:#ffd43b}
+.trait-pr{background:#1a5276;color:#a9d6e5}
+
+/* Detail Panel */
+.player-detail-panel{background:var(--surface);border-radius:var(--radius);padding:20px;position:sticky;top:10px}
+.detail-name{font-size:1.4em;font-weight:800;margin-bottom:2px}
+.detail-meta{color:var(--muted);margin-bottom:14px}
+.prob-section{margin:16px 0}
+.prob-row{display:flex;align-items:center;margin-bottom:8px}
+.prob-label{width:110px;font-size:.8em;color:var(--muted)}
+.prob-bar-bg{flex:1;height:16px;background:#333;border-radius:8px;overflow:hidden}
+.prob-bar-fill{height:100%;border-radius:8px;transition:width .5s ease}
+.prob-pct{width:40px;text-align:right;font-size:.8em;font-weight:700;margin-left:8px}
+.risk-meter{margin:12px 0}
+.risk-meter label{font-size:.75em;color:var(--muted);text-transform:uppercase}
+.risk-track{height:12px;background:linear-gradient(90deg,var(--success),var(--warn),var(--danger));border-radius:6px;position:relative;margin-top:4px}
+.risk-needle{width:4px;height:20px;background:#fff;border-radius:2px;position:absolute;top:-4px;transition:left .4s ease;box-shadow:0 0 6px #fff}
+.variance-box{background:var(--card);border-radius:8px;padding:12px;margin:12px 0;text-align:center}
+.variance-box .v-label{font-size:.7em;text-transform:uppercase;color:var(--muted)}
+.variance-box .v-value{font-size:1.6em;font-weight:800}
+.fit-indicator{margin:10px 0;font-size:.85em}
+.fit-good{color:var(--success)}.fit-ok{color:var(--warn)}.fit-bad{color:var(--danger)}
+.draft-btn{width:100%;background:linear-gradient(135deg,var(--accent),#00b894);color:#000;font-size:1.1em;padding:14px;border-radius:50px;margin-top:10px}
+.draft-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.show-math-toggle{background:var(--card);color:var(--accent);font-size:.8em;padding:8px 14px;margin-top:8px;width:100%}
+.coaching-section{margin-top:14px;background:var(--card);border-radius:8px;padding:12px}
+.coaching-section h4{font-size:.85em;color:var(--gold);margin-bottom:6px}
+.cp-btn{background:var(--surface);color:var(--gold);font-size:.78em;padding:6px 12px;margin-top:6px}
+
+/* Draft Animation */
+.draft-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .3s}
+.draft-card-anim{background:var(--surface);border-radius:20px;padding:40px;text-align:center;animation:cardFlip .8s ease;max-width:420px;width:90%}
+@keyframes cardFlip{0%{transform:rotateY(90deg) scale(.8);opacity:0}50%{transform:rotateY(0) scale(1.05);opacity:1}100%{transform:rotateY(0) scale(1)}}
+.draft-card-anim h2{color:var(--accent);margin-bottom:4px}
+.draft-card-anim .pick-result{margin:16px 0;padding:16px;background:var(--card);border-radius:12px}
+.draft-card-anim .result-label{font-size:.8em;color:var(--muted);text-transform:uppercase}
+.draft-card-anim .result-value{font-size:1.3em;font-weight:800;margin-top:4px}
+.draft-card-anim button{margin-top:12px;background:var(--accent);color:#000;padding:12px 32px}
+
+/* ===== EXPERIMENT MODE ===== */
+#experiment-screen{padding:20px;max-width:800px;margin:0 auto}
+.exp-player-select{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.exp-player-btn{background:var(--card);color:var(--text);padding:10px 16px;font-size:.85em;border:2px solid transparent}
+.exp-player-btn.selected{border-color:var(--gold);color:var(--gold)}
+.histogram{display:flex;align-items:flex-end;gap:8px;height:200px;margin:20px 0;padding:0 10px}
+.hist-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end}
+.hist-bar{width:100%;border-radius:6px 6px 0 0;transition:height .6s ease;min-height:2px}
+.hist-label{font-size:.65em;color:var(--muted);margin-top:6px;text-align:center;line-height:1.2}
+.hist-count{font-size:.8em;font-weight:700;margin-bottom:4px}
+.exp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}
+.exp-stat{background:var(--card);border-radius:var(--radius);padding:16px;text-align:center}
+.exp-stat .stat-val{font-size:1.8em;font-weight:800;color:var(--accent)}
+.exp-stat .stat-label{font-size:.75em;color:var(--muted);margin-top:4px}
+.exp-conclusion{background:var(--surface);border-left:4px solid var(--gold);border-radius:8px;padding:16px;margin:16px 0;font-size:.95em;line-height:1.6}
+
+/* ===== RESULTS SCREEN ===== */
+#results-screen{padding:20px;max-width:850px;margin:0 auto}
+.results-header{text-align:center;margin-bottom:24px}
+.results-header h1{font-size:2em;color:var(--gold)}
+.score-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+.score-card{background:var(--surface);border-radius:var(--radius);padding:24px;text-align:center}
+.score-card .sc-value{font-size:3em;font-weight:900}
+.score-card .sc-label{font-size:.85em;color:var(--muted);margin-top:4px}
+.score-card .sc-desc{font-size:.8em;margin-top:8px;color:var(--text);line-height:1.5}
+.picks-recap{margin:20px 0}
+.pick-row{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+.pick-row .pick-num{font-size:.75em;color:var(--muted);min-width:60px}
+.pick-row .pick-name{font-weight:700;flex:1}
+.pick-row .pick-outcome{font-weight:700;font-size:.85em;padding:4px 12px;border-radius:20px}
+.outcome-allpro{background:var(--gold);color:#000}
+.outcome-probowl{background:var(--blue);color:#000}
+.outcome-starter{background:var(--success);color:#000}
+.outcome-role{background:var(--muted);color:#000}
+.outcome-bust{background:var(--danger);color:#fff}
+.reflection-box{background:var(--surface);border-radius:var(--radius);padding:20px;margin:20px 0}
+.reflection-box h3{color:var(--accent);margin-bottom:12px}
+.reflection-box ol{padding-left:20px;line-height:2.2;font-size:.95em}
+.btn-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:20px 0}
+.btn-secondary{background:var(--card);color:var(--text)}
+.btn-primary{background:var(--accent);color:#000}
+.btn-warn{background:var(--gold);color:#000}
+
+/* ===== TEACHER MODE BANNER ===== */
+.teacher-banner{background:linear-gradient(90deg,#7b2d8b,#5c2d8b);color:#fff;text-align:center;padding:8px;font-size:.8em;font-weight:600}
+.discussion-prompt{background:#2d1a4e;border-left:4px solid var(--purple);border-radius:8px;padding:12px;margin:10px 0;font-size:.85em;color:#e0d0ff;line-height:1.5}
+
+/* ===== TOGGLE SWITCHES ===== */
+.toggle-row{display:flex;align-items:center;gap:10px;margin:10px 0}
+.toggle{position:relative;width:44px;height:24px;background:#444;border-radius:12px;cursor:pointer;transition:background .3s}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .3s}
+.toggle.on::after{left:22px}
+.toggle-label{font-size:.85em;color:var(--muted)}
+
+/* ===== NAV BAR ===== */
+.nav-bar{background:var(--surface);display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid #333;position:sticky;top:0;z-index:100}
+.nav-bar .logo{font-weight:800;font-size:1em;color:var(--accent)}
+.nav-btns{display:flex;gap:8px}
+.nav-btns button{background:var(--card);color:var(--text);font-size:.78em;padding:6px 14px}
+
+/* ===== AUTO DRAFT ===== */
+.auto-results{max-height:400px;overflow-y:auto;margin:16px 0}
+.auto-run{background:var(--card);border-radius:10px;padding:12px;margin-bottom:8px}
+.auto-run summary{cursor:pointer;font-weight:600;font-size:.9em}
+.auto-run .auto-score{float:right;font-weight:800;color:var(--accent)}
+
+/* ===== NEEDS BADGES ===== */
+.needs-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.need-badge{font-size:.65em;padding:3px 8px;border-radius:12px;font-weight:600}
+.need-high{background:#9c2a2a;color:#ffc9c9}.need-med{background:#5c4d1a;color:#ffd43b}.need-low{background:#2d6a4f;color:#b7e4c7}
+
+/* Progress indicator */
+.pick-progress{display:flex;gap:4px;margin:8px 0}
+.pick-dot{width:18px;height:18px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:.55em;font-weight:700;transition:all .3s}
+.pick-dot.done{background:var(--accent);color:#000}.pick-dot.current{background:var(--gold);color:#000;transform:scale(1.3)}
+
+/* Tooltip style explanations */
+.explain-box{background:var(--card);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.82em;color:var(--text);line-height:1.5;border-left:3px solid var(--blue)}
+
+/* Quick mode selector in header */
+.mode-toggle-group{display:flex;gap:0;border-radius:8px;overflow:hidden;border:2px solid var(--card)}
+.mode-toggle-group button{border-radius:0;background:var(--card);color:var(--muted);padding:6px 14px;font-size:.8em}
+.mode-toggle-group button.active{background:var(--accent);color:#000}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav-bar" id="navbar">
+  <div class="logo">🏈 NFL Draft Randomness Lab</div>
+  <div class="nav-btns">
+    <button onclick="showScreen('welcome')">Home</button>
+    <button onclick="showScreen('experiment-screen')">Experiment</button>
+    <div class="toggle-row" style="margin:0">
+      <div class="toggle" id="teacherToggle" onclick="toggleTeacher()"></div>
+      <span class="toggle-label">Teacher Mode</span>
+    </div>
+  </div>
+</nav>
+<div class="teacher-banner" id="teacherBanner" style="display:none">TEACHER MODE ON — All probability math is visible. Discussion prompts appear after each pick.</div>
+
+<!-- ===== WELCOME SCREEN ===== -->
+<div class="screen active" id="welcome">
+  <h1>NFL Draft Randomness Lab</h1>
+  <p class="subtitle">Be the GM. Make your picks. Discover why the draft is so unpredictable!</p>
+
+  <div class="learning-box">
+    <h3>What You'll Learn</h3>
+    <ul>
+      <li><strong>Draft picks are like rolling special dice</strong> — there's a range of outcomes, not just one sure thing.</li>
+      <li><strong>Even the best prospects can bust</strong>, and late-round picks sometimes become superstars.</li>
+      <li><strong>Randomness comes from many places</strong>: injuries, coaching, how well a player fits the team, and plain luck.</li>
+      <li><strong>Run experiments</strong> to see this for yourself — simulate the same pick many times!</li>
+    </ul>
+  </div>
+
+  <h3 style="margin-top:24px;color:var(--muted)">Choose Your Draft Class</h3>
+  <div class="setup-grid" id="classSelect">
+    <div class="setup-card selected" data-class="modern" onclick="selectClass('modern')">
+      <h4>Modern Prospects</h4>
+      <p>Today's top draft-eligible players</p>
+    </div>
+    <div class="setup-card" data-class="historical" onclick="selectClass('historical')">
+      <h4>Historical Class (2018)</h4>
+      <p>Look back — compare sim results to what really happened!</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:16px;color:var(--muted)">Choose Your Team's Scheme</h3>
+  <p style="font-size:.82em;color:var(--muted);margin-bottom:8px">Players that fit your scheme get a boost. Mismatches are risky!</p>
+  <div class="scheme-grid" id="schemeSelect">
+    <button class="scheme-btn selected" onclick="selectScheme('West Coast')">West Coast</button>
+    <button class="scheme-btn" onclick="selectScheme('Air Raid')">Air Raid</button>
+    <button class="scheme-btn" onclick="selectScheme('Power Run')">Power Run</button>
+    <button class="scheme-btn" onclick="selectScheme('3-4 Defense')">3-4 Defense</button>
+    <button class="scheme-btn" onclick="selectScheme('4-3 Defense')">4-3 Defense</button>
+    <button class="scheme-btn" onclick="selectScheme('Zone Heavy')">Zone Heavy</button>
+  </div>
+
+  <h3 style="margin-top:16px;color:var(--muted)">Draft Length</h3>
+  <div class="setup-grid">
+    <div class="setup-card" data-rounds="3" onclick="selectRounds(3)">
+      <h4>Quick Mode (3 Rounds)</h4>
+      <p>Perfect for a short class period</p>
+    </div>
+    <div class="setup-card selected" data-rounds="7" onclick="selectRounds(7)">
+      <h4>Full Draft (7 Rounds)</h4>
+      <p>The complete experience</p>
+    </div>
+  </div>
+
+  <button class="start-btn" onclick="startDraft()">Start Draft!</button>
+  <p style="margin-top:12px"><button class="btn-secondary" onclick="showScreen('experiment-screen')" style="background:var(--card);color:var(--accent)">Or jump to Experiment Mode →</button></p>
+</div>
+
+<!-- ===== DRAFT SCREEN ===== -->
+<div class="screen" id="draft-screen">
+  <div class="draft-header">
+    <div>
+      <div class="round-info">Round <span id="currentRound">1</span> — Pick <span id="currentPick">1</span></div>
+      <div class="pick-progress" id="pickProgress"></div>
+    </div>
+    <div class="meters">
+      <div class="meter">
+        <label>Team Needs</label>
+        <div class="meter-bar"><div class="meter-fill" id="needsMeter" style="width:80%;background:var(--danger)"></div></div>
+      </div>
+      <div class="meter">
+        <label>Fan Happiness</label>
+        <div class="meter-bar"><div class="meter-fill" id="fanMeter" style="width:50%;background:var(--warn)"></div></div>
+      </div>
+      <div class="meter">
+        <label>GM Job Security</label>
+        <div class="meter-bar"><div class="meter-fill" id="jobMeter" style="width:60%;background:var(--accent)"></div></div>
+      </div>
+    </div>
+    <div>
+      <span style="font-size:.75em;color:var(--gold)">Coaching Points: </span>
+      <span id="coachingPointsDisplay" style="font-weight:800;color:var(--gold)">3</span>
+    </div>
+  </div>
+
+  <div style="padding:0 8px">
+    <label style="font-size:.75em;color:var(--muted)">Team Needs:</label>
+    <div class="needs-row" id="needsRow"></div>
+  </div>
+
+  <div class="draft-layout">
+    <!-- Left: Board -->
+    <div>
+      <div class="board-controls">
+        <select id="posFilter" onchange="renderBoard()">
+          <option value="ALL">All Positions</option>
+          <option>QB</option><option>RB</option><option>WR</option><option>TE</option>
+          <option>OT</option><option>IOL</option><option>EDGE</option><option>DT</option>
+          <option>LB</option><option>CB</option><option>S</option>
+        </select>
+        <select id="tierFilter" onchange="renderBoard()">
+          <option value="ALL">All Tiers</option>
+          <option value="A">Tier A</option><option value="B">Tier B</option>
+          <option value="C">Tier C</option><option value="D">Tier D</option>
+        </select>
+        <input type="text" id="nameSearch" placeholder="Search name..." oninput="renderBoard()">
+      </div>
+      <div class="prospect-list" id="prospectList"></div>
+    </div>
+
+    <!-- Right: Detail -->
+    <div class="player-detail-panel" id="detailPanel">
+      <div id="detailContent">
+        <p style="color:var(--muted);text-align:center;margin-top:40px">← Click a player to see their scouting report</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EXPERIMENT SCREEN ===== -->
+<div class="screen" id="experiment-screen">
+  <h2 style="color:var(--gold);margin-bottom:4px">🧪 Run the Experiment</h2>
+  <p style="color:var(--muted);margin-bottom:16px;font-size:.92em">Pick a player, simulate their career 50 times, and see how results spread out. This is how real randomness works!</p>
+
+  <div class="learning-box">
+    <h3>How This Works</h3>
+    <ul>
+      <li>You pick one player from the board.</li>
+      <li>We "draft" that player <strong>50 separate times</strong> — like 50 different universes!</li>
+      <li>Each time, randomness gives them a different career.</li>
+      <li>The chart shows how many times each outcome happened.</li>
+    </ul>
+  </div>
+
+  <h4 style="margin:12px 0 8px;color:var(--muted)">Select a player to test:</h4>
+  <div class="board-controls" style="margin-bottom:8px">
+    <select id="expPosFilter" onchange="renderExpPlayers()">
+      <option value="ALL">All Positions</option>
+      <option>QB</option><option>RB</option><option>WR</option><option>TE</option>
+      <option>OT</option><option>IOL</option><option>EDGE</option><option>DT</option>
+      <option>LB</option><option>CB</option><option>S</option>
+    </select>
+  </div>
+  <div class="exp-player-select" id="expPlayerList"></div>
+
+  <button class="start-btn" id="runExpBtn" onclick="runExperiment()" disabled style="margin:16px 0;font-size:1em;padding:12px 32px">Simulate 50 Careers</button>
+
+  <div id="expResults" style="display:none">
+    <h3 style="margin-bottom:8px">Results for <span id="expPlayerName" style="color:var(--gold)"></span></h3>
+    <div class="histogram" id="histogram"></div>
+    <div class="exp-stats" id="expStats"></div>
+    <div class="exp-conclusion" id="expConclusion"></div>
+    <div class="discussion-prompt" id="expDiscussion" style="display:none"></div>
+  </div>
+  <div style="margin-top:20px;text-align:center">
+    <button class="btn-secondary" onclick="showScreen('welcome')">← Back to Setup</button>
+  </div>
+</div>
+
+<!-- ===== RESULTS SCREEN ===== -->
+<div class="screen" id="results-screen">
+  <div class="results-header">
+    <h1>Draft Complete!</h1>
+    <p style="color:var(--muted)">Let's see how your picks turned out...</p>
+    <button class="btn-primary" onclick="simSeasons()" id="simBtn" style="margin:12px 0">Simulate 5 Seasons →</button>
+  </div>
+  <div class="score-cards" id="scoreCards"></div>
+  <div class="explain-box" id="processExplain"></div>
+  <h3 style="margin:20px 0 10px">Your Picks</h3>
+  <div id="picksRecap"></div>
+  <div class="reflection-box">
+    <h3>Think About It!</h3>
+    <ol>
+      <li>Did you draft players with a <strong>safe floor</strong> or a <strong>high ceiling</strong>? Which worked out better?</li>
+      <li>How much did <strong>scheme fit</strong> affect your results? Did mismatches hurt?</li>
+      <li>Go to <strong>Experiment Mode</strong> and simulate your best pick 50 times. Is the result always the same?</li>
+    </ol>
+  </div>
+  <div class="discussion-prompt" id="resultsDiscussion" style="display:none">
+    <strong>Teacher Discussion:</strong> Ask students: "If two GMs both make smart picks, can one still end up with a much worse team? Why?" Connect this to how randomness affects real-life decisions beyond football.
+  </div>
+  <div class="btn-row">
+    <button class="btn-primary" onclick="resetDraft()">Draft Again</button>
+    <button class="btn-warn" onclick="runAutoDrafts()">Run 20 Drafts</button>
+    <button class="btn-secondary" onclick="showScreen('experiment-screen')">Experiment Mode</button>
+  </div>
+  <div id="autoResults"></div>
+</div>
+
+<script>
+// ============================================================
+// DATA — REAL NAMES, FICTIONAL RATINGS
+// ============================================================
+const MODERN_PLAYERS=[
+  {name:"Caleb Williams",pos:"QB",school:"USC",tier:"A",traits:["Boom/Bust"],fit:["Air Raid","West Coast"],notes:"Dual-threat passer with elite arm talent"},
+  {name:"Drake Maye",pos:"QB",school:"UNC",tier:"A",traits:["Pro-Ready"],fit:["West Coast","Air Raid"],notes:"Polished pocket passer"},
+  {name:"Jayden Daniels",pos:"QB",school:"LSU",tier:"A",traits:["Boom/Bust"],fit:["Air Raid"],notes:"Electric runner and thrower"},
+  {name:"Bo Nix",pos:"QB",school:"Oregon",tier:"B",traits:["High Floor"],fit:["West Coast"],notes:"Experienced and steady"},
+  {name:"J.J. McCarthy",pos:"QB",school:"Michigan",tier:"B",traits:["Pro-Ready"],fit:["West Coast","Power Run"],notes:"Winner with good decision-making"},
+  {name:"Michael Penix Jr.",pos:"QB",school:"Washington",tier:"B",traits:["Boom/Bust","Injury Risk"],fit:["Air Raid"],notes:"Big arm but injury history"},
+  {name:"Marvin Harrison Jr.",pos:"WR",school:"Ohio State",tier:"A",traits:["Pro-Ready","High Floor"],fit:["West Coast","Air Raid"],notes:"Elite route runner, great hands"},
+  {name:"Malik Nabers",pos:"WR",school:"LSU",tier:"A",traits:["Boom/Bust"],fit:["Air Raid"],notes:"Explosive playmaker"},
+  {name:"Rome Odunze",pos:"WR",school:"Washington",tier:"A",traits:["High Floor"],fit:["West Coast"],notes:"Complete receiver"},
+  {name:"Keon Coleman",pos:"WR",school:"Florida State",tier:"B",traits:["Boom/Bust","Raw"],fit:["Air Raid"],notes:"Huge catch radius, needs polish"},
+  {name:"Ladd McConkey",pos:"WR",school:"Georgia",tier:"B",traits:["Pro-Ready","High Floor"],fit:["West Coast"],notes:"Reliable slot weapon"},
+  {name:"Adonai Mitchell",pos:"WR",school:"Texas",tier:"B",traits:["Raw"],fit:["Air Raid","West Coast"],notes:"Athletic but developing"},
+  {name:"Brian Thomas Jr.",pos:"WR",school:"LSU",tier:"B",traits:["Boom/Bust"],fit:["Air Raid"],notes:"Speed demon with big-play ability"},
+  {name:"Brock Bowers",pos:"TE",school:"Georgia",tier:"A",traits:["Pro-Ready","High Floor"],fit:["West Coast","Power Run"],notes:"Best TE prospect in years"},
+  {name:"Ben Sinnott",pos:"TE",school:"Kansas State",tier:"C",traits:["Raw"],fit:["West Coast"],notes:"Athletic with upside"},
+  {name:"Ja'Tavion Sanders",pos:"TE",school:"Texas",tier:"C",traits:["Boom/Bust"],fit:["Air Raid"],notes:"Freaky athlete at tight end"},
+  {name:"Joe Alt",pos:"OT",school:"Notre Dame",tier:"A",traits:["Pro-Ready","High Floor"],fit:["West Coast","Power Run","Air Raid"],notes:"Franchise left tackle"},
+  {name:"Olu Fashanu",pos:"OT",school:"Penn State",tier:"A",traits:["High Floor"],fit:["Power Run","West Coast"],notes:"Powerful and technically sound"},
+  {name:"Amarius Mims",pos:"OT",school:"Georgia",tier:"B",traits:["Raw","Boom/Bust"],fit:["Power Run"],notes:"Massive upside, needs coaching"},
+  {name:"Tyler Guyton",pos:"OT",school:"Oklahoma",tier:"B",traits:["Raw"],fit:["Power Run","Zone Heavy"],notes:"Athletic developmental tackle"},
+  {name:"Jackson Powers-Johnson",pos:"IOL",school:"Oregon",tier:"B",traits:["Pro-Ready"],fit:["West Coast","Power Run"],notes:"Smart, tough interior lineman"},
+  {name:"Graham Barton",pos:"IOL",school:"Duke",tier:"B",traits:["High Floor"],fit:["West Coast","Zone Heavy"],notes:"Versatile and solid"},
+  {name:"Zach Frazier",pos:"IOL",school:"West Virginia",tier:"C",traits:["High Floor"],fit:["Power Run"],notes:"Tough run blocker"},
+  {name:"Jared Verse",pos:"EDGE",school:"Florida State",tier:"A",traits:["Boom/Bust"],fit:["4-3 Defense","3-4 Defense"],notes:"Explosive pass rusher"},
+  {name:"Dallas Turner",pos:"EDGE",school:"Alabama",tier:"A",traits:["Pro-Ready"],fit:["3-4 Defense","4-3 Defense"],notes:"Complete edge defender"},
+  {name:"Laiatu Latu",pos:"EDGE",school:"UCLA",tier:"A",traits:["High Floor","Injury Risk"],fit:["4-3 Defense"],notes:"Polished but durability concern"},
+  {name:"Chop Robinson",pos:"EDGE",school:"Penn State",tier:"B",traits:["Raw","Boom/Bust"],fit:["4-3 Defense"],notes:"Twitchy speed rusher"},
+  {name:"Darius Robinson",pos:"EDGE",school:"Missouri",tier:"B",traits:["High Floor"],fit:["3-4 Defense","4-3 Defense"],notes:"Versatile defensive end"},
+  {name:"Bralen Trice",pos:"EDGE",school:"Washington",tier:"C",traits:["Raw"],fit:["4-3 Defense"],notes:"Length and power, still developing"},
+  {name:"Byron Murphy II",pos:"DT",school:"Texas",tier:"A",traits:["Pro-Ready","High Floor"],fit:["Power Run","3-4 Defense","4-3 Defense"],notes:"Dominant interior force"},
+  {name:"Kris Jenkins",pos:"DT",school:"Michigan",tier:"B",traits:["High Floor"],fit:["3-4 Defense","Power Run"],notes:"Run-stuffing nose tackle"},
+  {name:"T'Vondre Sweat",pos:"DT",school:"Texas",tier:"B",traits:["High Floor"],fit:["3-4 Defense","Power Run"],notes:"Massive space-eater"},
+  {name:"Jer'Zhan Newton",pos:"DT",school:"Illinois",tier:"B",traits:["Boom/Bust"],fit:["4-3 Defense"],notes:"Disruptive interior pass rush"},
+  {name:"Terrion Arnold",pos:"CB",school:"Alabama",tier:"A",traits:["Pro-Ready"],fit:["Zone Heavy","4-3 Defense"],notes:"Shutdown corner potential"},
+  {name:"Quinyon Mitchell",pos:"CB",school:"Toledo",tier:"A",traits:["High Floor"],fit:["Zone Heavy","3-4 Defense"],notes:"Smooth coverage skills"},
+  {name:"Nate Wiggins",pos:"CB",school:"Clemson",tier:"B",traits:["Boom/Bust"],fit:["Zone Heavy"],notes:"Length and speed, inconsistent"},
+  {name:"Kool-Aid McKinstry",pos:"CB",school:"Alabama",tier:"B",traits:["Pro-Ready"],fit:["Zone Heavy","3-4 Defense"],notes:"Versatile defensive back"},
+  {name:"Cooper DeJean",pos:"CB",school:"Iowa",tier:"B",traits:["High Floor"],fit:["Zone Heavy","4-3 Defense"],notes:"Playmaker with ball skills"},
+  {name:"Xavier Worthy",pos:"WR",school:"Texas",tier:"B",traits:["Boom/Bust"],fit:["Air Raid","West Coast"],notes:"Blazing speed threat"},
+  {name:"Jonathon Brooks",pos:"RB",school:"Texas",tier:"B",traits:["Injury Risk","High Floor"],fit:["Power Run","West Coast"],notes:"Complete back, ACL recovery"},
+  {name:"Trey Benson",pos:"RB",school:"Florida State",tier:"B",traits:["Raw","Boom/Bust"],fit:["Power Run"],notes:"Physical downhill runner"},
+  {name:"MarShawn Lloyd",pos:"RB",school:"USC",tier:"C",traits:["Injury Risk"],fit:["West Coast","Zone Heavy"],notes:"Versatile but injury concerns"},
+  {name:"Edgerrin Cooper",pos:"LB",school:"Texas A&M",tier:"B",traits:["Pro-Ready"],fit:["3-4 Defense","4-3 Defense"],notes:"Instinctive tackler"},
+  {name:"Junior Colson",pos:"LB",school:"Michigan",tier:"B",traits:["High Floor"],fit:["4-3 Defense","3-4 Defense"],notes:"Solid all-around linebacker"},
+  {name:"Payton Wilson",pos:"LB",school:"NC State",tier:"B",traits:["Boom/Bust","Injury Risk"],fit:["4-3 Defense"],notes:"Playmaker with durability questions"},
+  {name:"Xavier Legette",pos:"WR",school:"South Carolina",tier:"C",traits:["Raw","Boom/Bust"],fit:["Air Raid"],notes:"Big-play potential, still developing"},
+  {name:"Brandon Dorlus",pos:"DT",school:"Oregon",tier:"C",traits:["High Floor"],fit:["4-3 Defense"],notes:"Steady interior defender"},
+  {name:"Malachi Corley",pos:"WR",school:"Western Kentucky",tier:"C",traits:["Raw"],fit:["West Coast"],notes:"YAC monster, route work needed"},
+  {name:"Calen Bullock",pos:"S",school:"USC",tier:"B",traits:["High Floor"],fit:["Zone Heavy","4-3 Defense"],notes:"Range and ball skills"},
+  {name:"Tyler Nubin",pos:"S",school:"Minnesota",tier:"B",traits:["Pro-Ready"],fit:["Zone Heavy","3-4 Defense"],notes:"Smart, reliable safety"},
+  {name:"Daijahn Anthony",pos:"S",school:"Oklahoma",tier:"C",traits:["Raw","Boom/Bust"],fit:["Zone Heavy"],notes:"Freakish athlete, learning the position"},
+  {name:"Jaylen Wright",pos:"RB",school:"Tennessee",tier:"C",traits:["High Floor"],fit:["Zone Heavy","West Coast"],notes:"Quick and elusive back"},
+];
+
+const HISTORICAL_PLAYERS=[
+  {name:"Baker Mayfield",pos:"QB",school:"Oklahoma",tier:"A",traits:["Boom/Bust"],fit:["Air Raid","West Coast"],notes:"2018 #1 pick, fiery competitor"},
+  {name:"Sam Darnold",pos:"QB",school:"USC",tier:"A",traits:["Raw","Boom/Bust"],fit:["West Coast"],notes:"2018 #3 pick, big arm talent"},
+  {name:"Josh Allen",pos:"QB",school:"Wyoming",tier:"B",traits:["Raw","Boom/Bust"],fit:["Power Run","West Coast"],notes:"2018 #7 pick, massive arm, accuracy concerns"},
+  {name:"Josh Rosen",pos:"QB",school:"UCLA",tier:"A",traits:["Pro-Ready"],fit:["West Coast","Air Raid"],notes:"2018 #10 pick, polished passer"},
+  {name:"Lamar Jackson",pos:"QB",school:"Louisville",tier:"B",traits:["Boom/Bust","Raw"],fit:["Power Run"],notes:"2018 #32 pick, dual-threat dynamo"},
+  {name:"Saquon Barkley",pos:"RB",school:"Penn State",tier:"A",traits:["Pro-Ready","High Floor"],fit:["West Coast","Power Run"],notes:"2018 #2 pick, generational talent"},
+  {name:"Rashaad Penny",pos:"RB",school:"San Diego State",tier:"C",traits:["Injury Risk"],fit:["Zone Heavy"],notes:"2018 1st rounder, productive college back"},
+  {name:"Nick Chubb",pos:"RB",school:"Georgia",tier:"B",traits:["High Floor","Injury Risk"],fit:["Power Run","Zone Heavy"],notes:"2018 2nd round, powerful runner"},
+  {name:"Calvin Ridley",pos:"WR",school:"Alabama",tier:"A",traits:["Pro-Ready"],fit:["West Coast","Air Raid"],notes:"2018 #26 pick, clean route runner"},
+  {name:"DJ Moore",pos:"WR",school:"Maryland",tier:"B",traits:["High Floor"],fit:["West Coast"],notes:"2018 #24 pick, do-it-all receiver"},
+  {name:"Courtland Sutton",pos:"WR",school:"SMU",tier:"B",traits:["Raw","Boom/Bust"],fit:["Air Raid"],notes:"2018 2nd round, contested-catch king"},
+  {name:"Hayden Hurst",pos:"TE",school:"South Carolina",tier:"B",traits:["Pro-Ready"],fit:["West Coast"],notes:"2018 #25 pick, converted baseball player"},
+  {name:"Mike Gesicki",pos:"TE",school:"Penn State",tier:"B",traits:["Boom/Bust"],fit:["Air Raid"],notes:"2018 2nd round, mismatch athlete"},
+  {name:"Quenton Nelson",pos:"IOL",school:"Notre Dame",tier:"A",traits:["Pro-Ready","High Floor"],fit:["Power Run","West Coast"],notes:"2018 #6 pick, generational guard"},
+  {name:"Frank Ragnow",pos:"IOL",school:"Arkansas",tier:"B",traits:["High Floor"],fit:["Power Run","Zone Heavy"],notes:"2018 1st round, tough center"},
+  {name:"Mike McGlinchey",pos:"OT",school:"Notre Dame",tier:"B",traits:["Pro-Ready"],fit:["Zone Heavy","West Coast"],notes:"2018 #9 pick, finesse tackle"},
+  {name:"Kolton Miller",pos:"OT",school:"UCLA",tier:"B",traits:["Raw"],fit:["Power Run"],notes:"2018 1st round, long and athletic"},
+  {name:"Connor Williams",pos:"IOL",school:"Texas",tier:"B",traits:["High Floor","Injury Risk"],fit:["Zone Heavy"],notes:"2018 2nd round, versatile lineman"},
+  {name:"Bradley Chubb",pos:"EDGE",school:"NC State",tier:"A",traits:["Pro-Ready","High Floor"],fit:["4-3 Defense","3-4 Defense"],notes:"2018 #5 pick, complete edge"},
+  {name:"Marcus Davenport",pos:"EDGE",school:"UTSA",tier:"B",traits:["Raw","Boom/Bust","Injury Risk"],fit:["4-3 Defense"],notes:"2018 1st round, raw power"},
+  {name:"Harold Landry",pos:"EDGE",school:"Boston College",tier:"B",traits:["High Floor"],fit:["3-4 Defense","4-3 Defense"],notes:"2018 2nd round, bend and speed"},
+  {name:"Arden Key",pos:"EDGE",school:"LSU",tier:"C",traits:["Boom/Bust","Raw"],fit:["4-3 Defense"],notes:"2018 3rd round, explosive but inconsistent"},
+  {name:"Vita Vea",pos:"DT",school:"Washington",tier:"A",traits:["Pro-Ready","High Floor"],fit:["3-4 Defense","Power Run"],notes:"2018 #12 pick, immovable force"},
+  {name:"Da'Ron Payne",pos:"DT",school:"Alabama",tier:"B",traits:["High Floor"],fit:["3-4 Defense","4-3 Defense"],notes:"2018 #13 pick, two-gap anchor"},
+  {name:"Taven Bryan",pos:"DT",school:"Florida",tier:"B",traits:["Raw","Boom/Bust"],fit:["4-3 Defense"],notes:"2018 1st round, athletic upside"},
+  {name:"Denzel Ward",pos:"CB",school:"Ohio State",tier:"A",traits:["Pro-Ready"],fit:["Zone Heavy","4-3 Defense"],notes:"2018 #4 pick, sticky coverage"},
+  {name:"Jaire Alexander",pos:"CB",school:"Louisville",tier:"A",traits:["Boom/Bust","High Floor"],fit:["Zone Heavy","3-4 Defense"],notes:"2018 #18 pick, feisty competitor"},
+  {name:"Mike Hughes",pos:"CB",school:"UCF",tier:"B",traits:["Boom/Bust","Injury Risk"],fit:["Zone Heavy"],notes:"2018 1st round, electric returner"},
+  {name:"Josh Jackson",pos:"CB",school:"Iowa",tier:"B",traits:["High Floor"],fit:["Zone Heavy"],notes:"2018 2nd round, ball hawk"},
+  {name:"Donte Jackson",pos:"CB",school:"LSU",tier:"B",traits:["Boom/Bust"],fit:["Zone Heavy","4-3 Defense"],notes:"2018 2nd round, blazing speed"},
+  {name:"Roquan Smith",pos:"LB",school:"Georgia",tier:"A",traits:["Pro-Ready","High Floor"],fit:["4-3 Defense","3-4 Defense"],notes:"2018 #8 pick, sideline to sideline"},
+  {name:"Tremaine Edmunds",pos:"LB",school:"Virginia Tech",tier:"A",traits:["Raw","Boom/Bust"],fit:["3-4 Defense"],notes:"2018 #16 pick, physical freak"},
+  {name:"Rashaan Evans",pos:"LB",school:"Alabama",tier:"B",traits:["High Floor"],fit:["3-4 Defense","4-3 Defense"],notes:"2018 1st round, downhill thumper"},
+  {name:"Leighton Vander Esch",pos:"LB",school:"Boise State",tier:"B",traits:["High Floor","Injury Risk"],fit:["4-3 Defense"],notes:"2018 1st round, rangy tackler"},
+  {name:"Derwin James",pos:"S",school:"Florida State",tier:"A",traits:["Pro-Ready","High Floor"],fit:["Zone Heavy","4-3 Defense","3-4 Defense"],notes:"2018 #17 pick, unicorn safety"},
+  {name:"Minkah Fitzpatrick",pos:"S",school:"Alabama",tier:"A",traits:["Pro-Ready","High Floor"],fit:["Zone Heavy","3-4 Defense"],notes:"2018 #11 pick, chess piece"},
+  {name:"Justin Reid",pos:"S",school:"Stanford",tier:"B",traits:["High Floor"],fit:["Zone Heavy"],notes:"2018 3rd round, ball-hawking safety"},
+  {name:"Jessie Bates III",pos:"S",school:"Wake Forest",tier:"C",traits:["Raw","High Floor"],fit:["Zone Heavy","4-3 Defense"],notes:"2018 2nd round, cerebral player"},
+  {name:"Ronald Jones II",pos:"RB",school:"USC",tier:"B",traits:["Boom/Bust"],fit:["Zone Heavy","West Coast"],notes:"2018 2nd round, speed back"},
+  {name:"Sony Michel",pos:"RB",school:"Georgia",tier:"B",traits:["Injury Risk"],fit:["Power Run","Zone Heavy"],notes:"2018 1st round, playoff hero"},
+  {name:"DJ Chark",pos:"WR",school:"LSU",tier:"C",traits:["Raw","Boom/Bust"],fit:["Air Raid"],notes:"2018 2nd round, deep threat"},
+  {name:"Christian Kirk",pos:"WR",school:"Texas A&M",tier:"B",traits:["High Floor"],fit:["West Coast","Air Raid"],notes:"2018 2nd round, reliable slot"},
+  {name:"Anthony Miller",pos:"WR",school:"Memphis",tier:"C",traits:["Boom/Bust"],fit:["West Coast"],notes:"2018 2nd round, feisty competitor"},
+  {name:"Dallas Goedert",pos:"TE",school:"South Dakota State",tier:"B",traits:["High Floor"],fit:["West Coast","Power Run"],notes:"2018 2nd round, all-around TE"},
+  {name:"Mark Andrews",pos:"TE",school:"Oklahoma",tier:"B",traits:["Boom/Bust"],fit:["Air Raid","West Coast"],notes:"2018 3rd round, red zone weapon"},
+  {name:"Isaiah Wynn",pos:"OT",school:"Georgia",tier:"B",traits:["High Floor","Injury Risk"],fit:["Zone Heavy","West Coast"],notes:"2018 1st round, versatile blocker"},
+  {name:"Orlando Brown Jr.",pos:"OT",school:"Oklahoma",tier:"C",traits:["Raw","High Floor"],fit:["Power Run"],notes:"2018 3rd round, mauler in the run game"},
+  {name:"Fred Warner",pos:"LB",school:"BYU",tier:"C",traits:["High Floor","Pro-Ready"],fit:["4-3 Defense","Zone Heavy"],notes:"2018 3rd round, coverage linebacker"},
+  {name:"Darius Leonard",pos:"LB",school:"South Carolina State",tier:"C",traits:["Boom/Bust","Raw"],fit:["4-3 Defense"],notes:"2018 2nd round, small-school riser"},
+  {name:"Sam Hubbard",pos:"EDGE",school:"Ohio State",tier:"C",traits:["High Floor"],fit:["4-3 Defense"],notes:"2018 3rd round, versatile end"},
+  {name:"Lorenzo Carter",pos:"EDGE",school:"Georgia",tier:"C",traits:["Raw","Boom/Bust"],fit:["3-4 Defense"],notes:"2018 3rd round, length and athleticism"},
+  {name:"Carlton Davis",pos:"CB",school:"Auburn",tier:"C",traits:["Boom/Bust"],fit:["Zone Heavy"],notes:"2018 2nd round, physical corner"},
+];
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let G={
+  players:[],draftedBy:[],selectedIdx:null,picks:[],round:1,pick:1,totalRounds:7,
+  scheme:"West Coast",draftClass:"modern",coachingPts:3,
+  needs:{QB:2,RB:2,WR:3,TE:1,OT:2,IOL:1,EDGE:2,DT:1,LB:2,CB:2,S:1},
+  fanHappy:50,jobSecurity:60,teacherMode:false,showMath:false,
+  seasonsSimmed:false
+};
+
+const OUTCOMES=["All-Pro","Pro Bowl","Solid Starter","Role Player","Bust"];
+const OUTCOME_SCORES={0:100,1:80,2:60,3:35,4:5};
+const OUTCOME_COLORS=["var(--gold)","var(--blue)","var(--success)","var(--muted)","var(--danger)"];
+const OUTCOME_CLASSES=["outcome-allpro","outcome-probowl","outcome-starter","outcome-role","outcome-bust"];
+const TIER_BASE={A:[18,27,30,18,7],B:[8,20,32,28,12],C:[3,12,28,35,22],D:[1,6,18,40,35]};
+
+// ============================================================
+// PROBABILITY ENGINE
+// ============================================================
+function getProbs(player,scheme,investedCP){
+  let p=[...TIER_BASE[player.tier]];
+  // Trait modifiers
+  if(player.traits.includes("Boom/Bust")){p[0]+=6;p[4]+=6;p[2]-=8;p[1]-=2;p[3]-=2}
+  if(player.traits.includes("Injury Risk")){p[4]+=8;p[3]+=4;p[0]-=4;p[1]-=4;p[2]-=4}
+  if(player.traits.includes("High Floor")){p[3]+=4;p[2]+=6;p[4]-=8;p[0]-=2}
+  if(player.traits.includes("Pro-Ready")){p[2]+=6;p[1]+=4;p[0]-=4;p[4]-=4;p[3]-=2}
+  if(player.traits.includes("Raw")){p[3]+=4;p[4]+=3;p[2]-=4;p[1]-=3}
+  // Coaching points invested
+  if(investedCP>0&&player.traits.includes("Raw")){
+    let boost=investedCP*4;p[0]+=boost;p[1]+=boost;p[4]-=boost;p[3]-=boost;
+  }
+  // Scheme fit
+  let fitLevel=getFitLevel(player,scheme);
+  if(fitLevel==="great"){p[0]+=4;p[1]+=4;p[4]-=4;p[3]-=4}
+  else if(fitLevel==="bad"){p[4]+=7;p[3]+=5;p[0]-=5;p[1]-=5;p[2]-=2}
+  // Clamp & normalize
+  for(let i=0;i<5;i++)p[i]=Math.max(p[i],1);
+  let sum=p.reduce((a,b)=>a+b,0);
+  p=p.map(v=>Math.round(v/sum*100));
+  // Fix rounding
+  let diff=100-p.reduce((a,b)=>a+b,0);
+  p[2]+=diff;
+  return p;
+}
+function getFitLevel(player,scheme){
+  if(!player.fit||player.fit.length===0)return"ok";
+  if(player.fit.includes(scheme))return"great";
+  // Check if any defensive scheme matches offensive player or vice versa
+  const offSchemes=["West Coast","Air Raid","Power Run"];
+  const defSchemes=["3-4 Defense","4-3 Defense","Zone Heavy"];
+  const offPos=["QB","RB","WR","TE","OT","IOL"];
+  const defPos=["EDGE","DT","LB","CB","S"];
+  if(offPos.includes(player.pos)&&defSchemes.includes(scheme))return"ok";
+  if(defPos.includes(player.pos)&&offSchemes.includes(scheme))return"ok";
+  return"bad";
+}
+function getRookieProbs(player,scheme,cp){
+  let career=getProbs(player,scheme,cp);
+  // Rookie year is more compressed — stars less likely, role player more likely
+  let r=[Math.round(career[0]*.4),Math.round(career[1]*.6),career[2],Math.round(career[3]*1.3),Math.round(career[4]*1.1)];
+  if(player.traits.includes("Pro-Ready")){r[1]+=8;r[2]+=5;r[3]-=8;r[4]-=5}
+  if(player.traits.includes("Raw")){r[3]+=10;r[4]+=5;r[1]-=8;r[2]-=7}
+  for(let i=0;i<5;i++)r[i]=Math.max(r[i],1);
+  let sum=r.reduce((a,b)=>a+b,0);
+  r=r.map(v=>Math.round(v/sum*100));
+  let diff=100-r.reduce((a,b)=>a+b,0);r[2]+=diff;
+  return r;
+}
+function simulateOutcome(probs){
+  let r=Math.random()*100,cum=0;
+  for(let i=0;i<5;i++){cum+=probs[i];if(r<cum)return i;}
+  return 4;
+}
+function calcEV(probs){
+  let ev=0;for(let i=0;i<5;i++)ev+=probs[i]/100*OUTCOME_SCORES[i];
+  return Math.round(ev*10)/10;
+}
+function calcVariance(probs){
+  let ev=calcEV(probs);
+  let v=0;for(let i=0;i<5;i++)v+=probs[i]/100*Math.pow(OUTCOME_SCORES[i]-ev,2);
+  return Math.round(Math.sqrt(v)*10)/10;
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function $(id){return document.getElementById(id)}
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+function selectClass(c){
+  G.draftClass=c;
+  document.querySelectorAll('#classSelect .setup-card').forEach(el=>{
+    el.classList.toggle('selected',el.dataset.class===c);
+  });
+}
+function selectScheme(s){
+  G.scheme=s;
+  document.querySelectorAll('.scheme-btn').forEach(el=>{
+    el.classList.toggle('selected',el.textContent===s);
+  });
+}
+function selectRounds(n){
+  G.totalRounds=n;
+  document.querySelectorAll('[data-rounds]').forEach(el=>{
+    el.classList.toggle('selected',parseInt(el.dataset.rounds)===n);
+  });
+}
+function toggleTeacher(){
+  G.teacherMode=!G.teacherMode;
+  $('teacherToggle').classList.toggle('on',G.teacherMode);
+  $('teacherBanner').style.display=G.teacherMode?'block':'none';
+  if(G.teacherMode)G.showMath=true;
+  renderBoard();
+  if(G.selectedIdx!==null)showDetail(G.selectedIdx);
+}
+function traitClass(t){
+  if(t==="High Floor")return"trait-hf";
+  if(t==="Boom/Bust")return"trait-bb";
+  if(t==="Injury Risk")return"trait-ir";
+  if(t==="Raw")return"trait-raw";
+  if(t==="Pro-Ready")return"trait-pr";
+  return"";
+}
+
+// ============================================================
+// DRAFT LOGIC
+// ============================================================
+function startDraft(){
+  G.players=(G.draftClass==="modern"?MODERN_PLAYERS:HISTORICAL_PLAYERS).map(p=>({...p,cp:0}));
+  G.draftedBy=new Array(G.players.length).fill(null);
+  G.picks=[];G.round=1;G.pick=1;G.selectedIdx=null;
+  G.coachingPts=3;G.fanHappy=50;G.jobSecurity=60;G.seasonsSimmed=false;
+  G.needs={QB:2,RB:2,WR:3,TE:1,OT:2,IOL:1,EDGE:2,DT:1,LB:2,CB:2,S:1};
+  showScreen('draft-screen');
+  updateHeader();renderBoard();
+  $('detailContent').innerHTML='<p style="color:var(--muted);text-align:center;margin-top:40px">← Click a player to see their scouting report</p>';
+}
+function updateHeader(){
+  $('currentRound').textContent=G.round;
+  $('currentPick').textContent=G.pick;
+  $('coachingPointsDisplay').textContent=G.coachingPts;
+  // Needs
+  let needsHTML='';
+  for(let pos in G.needs){
+    let lvl=G.needs[pos]>=2?'need-high':G.needs[pos]>=1?'need-med':'need-low';
+    needsHTML+=`<span class="need-badge ${lvl}">${pos}: ${G.needs[pos]>=2?'HIGH':G.needs[pos]>=1?'MED':'LOW'}</span>`;
+  }
+  $('needsRow').innerHTML=needsHTML;
+  // Meters
+  $('needsMeter').style.width=Math.max(5,Object.values(G.needs).reduce((a,b)=>a+b,0)/19*100)+'%';
+  $('fanMeter').style.width=Math.max(5,Math.min(100,G.fanHappy))+'%';
+  $('fanMeter').style.background=G.fanHappy>60?'var(--success)':G.fanHappy>35?'var(--warn)':'var(--danger)';
+  $('jobMeter').style.width=Math.max(5,Math.min(100,G.jobSecurity))+'%';
+  $('jobMeter').style.background=G.jobSecurity>60?'var(--accent)':G.jobSecurity>35?'var(--warn)':'var(--danger)';
+  // Progress dots
+  let total=G.totalRounds;
+  let dots='';for(let i=1;i<=total;i++){
+    let cls=i<G.round?'done':i===G.round?'current':'';
+    dots+=`<div class="pick-dot ${cls}">${i}</div>`;
+  }
+  $('pickProgress').innerHTML=dots;
+}
+function renderBoard(){
+  let posF=$('posFilter').value;
+  let tierF=$('tierFilter').value;
+  let search=$('nameSearch').value.toLowerCase();
+  let html='';
+  G.players.forEach((p,i)=>{
+    if(posF!=="ALL"&&p.pos!==posF)return;
+    if(tierF!=="ALL"&&p.tier!==tierF)return;
+    if(search&&!p.name.toLowerCase().includes(search))return;
+    let drafted=G.draftedBy[i]!==null;
+    let sel=G.selectedIdx===i;
+    let traits=p.traits.map(t=>`<span class="trait-tag ${traitClass(t)}">${t}</span>`).join('');
+    html+=`<div class="p-card ${drafted?'drafted':''} ${sel?'selected':''}" onclick="selectPlayer(${i})">
+      <span class="tier-badge tier-${p.tier}">${p.tier}</span>
+      <div class="p-name">${p.name}</div>
+      <div class="p-meta">${p.pos} — ${p.school}</div>
+      <div class="traits">${traits}</div>
+    </div>`;
+  });
+  if(!html)html='<p style="color:var(--muted);padding:20px">No matching players. Try changing your filters.</p>';
+  $('prospectList').innerHTML=html;
+}
+function selectPlayer(idx){
+  if(G.draftedBy[idx]!==null)return;
+  G.selectedIdx=idx;
+  renderBoard();
+  showDetail(idx);
+}
+function showDetail(idx){
+  let p=G.players[idx];
+  let probs=getProbs(p,G.scheme,p.cp||0);
+  let rookieProbs=getRookieProbs(p,G.scheme,p.cp||0);
+  let ev=calcEV(probs);
+  let variance=calcVariance(probs);
+  let fitLevel=getFitLevel(p,G.scheme);
+  let fitText=fitLevel==='great'?'Great Fit!':fitLevel==='ok'?'Neutral Fit':'Bad Fit — Mismatch!';
+  let fitCls=fitLevel==='great'?'fit-good':fitLevel==='ok'?'fit-ok':'fit-bad';
+  let riskPct=probs[4]+probs[3]*.3;
+  let showMath=G.showMath||G.teacherMode;
+
+  let html=`
+    <div class="detail-name">${p.name}</div>
+    <div class="detail-meta">${p.pos} — ${p.school} — Tier ${p.tier}</div>
+    <div class="traits" style="margin:8px 0">${p.traits.map(t=>`<span class="trait-tag ${traitClass(t)}">${t}</span>`).join('')}</div>
+    <p style="font-size:.82em;color:var(--muted);margin:6px 0">${p.notes}</p>
+    <div class="fit-indicator ${fitCls}">Scheme: ${G.scheme} → <strong>${fitText}</strong></div>
+
+    <div class="risk-meter">
+      <label>Risk Level</label>
+      <div class="risk-track"><div class="risk-needle" style="left:${Math.min(95,riskPct)}%"></div></div>
+    </div>
+
+    <div class="variance-box">
+      <div class="v-label">Variance Index (how unpredictable)</div>
+      <div class="v-value" style="color:${variance>28?'var(--danger)':variance>20?'var(--warn)':'var(--success)'}">${variance}</div>
+      <div style="font-size:.72em;color:var(--muted)">${variance>28?'Very Volatile — anything can happen!':variance>20?'Moderate — some surprises possible':'Steady — fairly predictable'}</div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin:8px 0">
+      <div style="flex:1;text-align:center;background:var(--card);border-radius:8px;padding:8px">
+        <div style="font-size:.65em;color:var(--muted);text-transform:uppercase">Ceiling</div>
+        <div style="font-size:1.1em;font-weight:800;color:var(--gold)">${OUTCOMES[probs[0]>=15?0:probs[1]>=20?1:2]}</div>
+      </div>
+      <div style="flex:1;text-align:center;background:var(--card);border-radius:8px;padding:8px">
+        <div style="font-size:.65em;color:var(--muted);text-transform:uppercase">Floor</div>
+        <div style="font-size:1.1em;font-weight:800;color:var(--danger)">${OUTCOMES[probs[4]>=15?4:probs[3]>=30?3:2]}</div>
+      </div>
+    </div>`;
+
+  if(showMath){
+    html+=`<div class="prob-section"><h4 style="font-size:.82em;color:var(--accent);margin-bottom:8px">Career Outcome Chances</h4>`;
+    for(let i=0;i<5;i++){
+      html+=`<div class="prob-row">
+        <span class="prob-label">${OUTCOMES[i]}</span>
+        <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${probs[i]}%;background:${OUTCOME_COLORS[i]}"></div></div>
+        <span class="prob-pct">${probs[i]}%</span>
+      </div>`;
+    }
+    html+=`<div style="font-size:.75em;color:var(--muted);margin-top:4px">Expected Value: <strong>${ev}</strong> / 100</div>`;
+    html+=`</div>`;
+  }
+
+  // Coaching points for Raw players
+  if(p.traits.includes("Raw")){
+    html+=`<div class="coaching-section">
+      <h4>Invest Coaching Points? (${G.coachingPts} left)</h4>
+      <p style="font-size:.78em;color:var(--muted)">Spending coaching points on a Raw player can improve their long-term chances — but it's still not guaranteed!</p>
+      <p style="font-size:.78em;margin-top:4px">Currently invested: <strong>${p.cp||0}</strong></p>
+      ${G.coachingPts>0?`<button class="cp-btn" onclick="investCP(${idx})">+1 Coaching Point</button>`:'<p style="font-size:.78em;color:var(--danger)">No coaching points left!</p>'}
+    </div>`;
+  }
+
+  html+=`<button class="draft-btn" onclick="draftPlayer(${idx})" ${G.selectedIdx===null?'disabled':''}>Draft ${p.name}</button>`;
+  html+=`<button class="show-math-toggle" onclick="toggleMath()">${showMath?'Hide':'Show'} the Math</button>`;
+
+  if(G.teacherMode){
+    html+=`<div class="discussion-prompt">
+      <strong>Discussion:</strong> This player has a ${probs[0]+probs[1]}% chance of being a star and a ${probs[4]}% chance of busting. If you drafted them 100 times, about how many times would they bust?
+    </div>`;
+  }
+
+  $('detailContent').innerHTML=html;
+}
+function toggleMath(){
+  G.showMath=!G.showMath;
+  if(G.selectedIdx!==null)showDetail(G.selectedIdx);
+}
+function investCP(idx){
+  if(G.coachingPts<=0)return;
+  G.coachingPts--;
+  G.players[idx].cp=(G.players[idx].cp||0)+1;
+  updateHeader();
+  showDetail(idx);
+}
+function draftPlayer(idx){
+  let p=G.players[idx];
+  let probs=getProbs(p,G.scheme,p.cp||0);
+  let rookieProbs=getRookieProbs(p,G.scheme,p.cp||0);
+  let rookieResult=simulateOutcome(rookieProbs);
+  let careerResult=simulateOutcome(probs);
+  // Career can't be worse than 1 tier below rookie (some correlation)
+  if(careerResult>rookieResult+2)careerResult=rookieResult+2;
+  if(careerResult<rookieResult-2)careerResult=rookieResult-2;
+  careerResult=Math.max(0,Math.min(4,careerResult));
+
+  let ev=calcEV(probs);
+  let fitLevel=getFitLevel(p,G.scheme);
+  let needVal=G.needs[p.pos]||0;
+
+  // Process score for this pick
+  let processScore=ev;
+  if(fitLevel==='great')processScore+=10;
+  else if(fitLevel==='bad')processScore-=15;
+  if(needVal>=2)processScore+=12;
+  else if(needVal<=0)processScore-=8;
+
+  G.draftedBy[idx]='user';
+  G.picks.push({idx,player:p,rookieResult,careerResult,probs,processScore,ev,fitLevel,round:G.round,pick:G.pick});
+
+  // Update needs
+  G.needs[p.pos]=Math.max(0,(G.needs[p.pos]||0)-1);
+
+  // Update fan happiness based on tier + round
+  if(p.tier==='A')G.fanHappy+=12;
+  else if(p.tier==='B')G.fanHappy+=5;
+  else G.fanHappy-=5;
+  if(needVal>=2)G.fanHappy+=5;
+  G.fanHappy=Math.max(0,Math.min(100,G.fanHappy));
+
+  // Job security based on process
+  if(processScore>70)G.jobSecurity+=8;
+  else if(processScore>50)G.jobSecurity+=3;
+  else G.jobSecurity-=5;
+  G.jobSecurity=Math.max(0,Math.min(100,G.jobSecurity));
+
+  showDraftAnimation(p,rookieResult,probs);
+}
+function showDraftAnimation(player,rookieResult,probs){
+  let probStr=`This pick had a ${probs[0]+probs[1]+probs[2]}% chance of being at least a Solid Starter.`;
+  if(rookieResult<=1)probStr+=` Great start — but the career outcome may still differ!`;
+  else if(rookieResult>=3)probStr+=` Rough rookie year — but some players develop late!`;
+
+  let overlay=document.createElement('div');
+  overlay.className='draft-overlay';
+  overlay.innerHTML=`
+    <div class="draft-card-anim">
+      <div style="font-size:.85em;color:var(--muted);text-transform:uppercase;letter-spacing:2px">The Draft Card Is In...</div>
+      <h2>${player.name}</h2>
+      <div style="color:var(--muted)">${player.pos} — ${player.school}</div>
+      <div class="pick-result">
+        <div class="result-label">Rookie Year Result</div>
+        <div class="result-value" style="color:${OUTCOME_COLORS[rookieResult]}">${OUTCOMES[rookieResult]}</div>
+      </div>
+      <div class="explain-box">${probStr}</div>
+      ${G.teacherMode?`<div class="discussion-prompt"><strong>Ask the class:</strong> Was this a lucky or unlucky result? How could the same pick turn out differently?</div>`:''}
+      <button onclick="closeDraftAnim(this)">Continue →</button>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+function closeDraftAnim(btn){
+  btn.closest('.draft-overlay').remove();
+  G.selectedIdx=null;
+  // Advance
+  if(G.round<G.totalRounds){
+    G.round++;G.pick++;
+    updateHeader();renderBoard();
+    $('detailContent').innerHTML='<p style="color:var(--muted);text-align:center;margin-top:40px">← Click a player for your next pick</p>';
+  } else {
+    showResults();
+  }
+}
+
+// ============================================================
+// RESULTS
+// ============================================================
+function showResults(){
+  showScreen('results-screen');
+  $('simBtn').style.display='inline-block';
+  $('simBtn').textContent='Simulate 5 Seasons →';
+  renderResults(false);
+}
+function simSeasons(){
+  G.seasonsSimmed=true;
+  $('simBtn').style.display='none';
+  renderResults(true);
+}
+function renderResults(showCareer){
+  let totalProcess=0,totalOutcome=0;
+  let recapHTML='';
+  G.picks.forEach((pk,i)=>{
+    totalProcess+=pk.processScore;
+    let outcomeIdx=showCareer?pk.careerResult:pk.rookieResult;
+    totalOutcome+=OUTCOME_SCORES[outcomeIdx];
+    recapHTML+=`<div class="pick-row">
+      <div class="pick-num">Rd ${pk.round}</div>
+      <div class="pick-name">${pk.player.name} <span style="color:var(--muted);font-size:.8em">${pk.player.pos}</span></div>
+      <div class="pick-outcome ${OUTCOME_CLASSES[outcomeIdx]}">${showCareer?'Career: ':'Rookie: '}${OUTCOMES[outcomeIdx]}</div>
+    </div>`;
+  });
+  let n=G.picks.length;
+  let avgProcess=Math.round(totalProcess/n);
+  let avgOutcome=Math.round(totalOutcome/n);
+
+  let processMsg,outcomeMsg;
+  if(avgProcess>=70)processMsg="Your draft strategy was excellent! You drafted smart.";
+  else if(avgProcess>=50)processMsg="Decent strategy — you made some solid decisions.";
+  else processMsg="Your strategy had some gaps — scheme fit and needs alignment matter!";
+
+  if(avgOutcome>=70)outcomeMsg="Your picks performed great — you got lucky AND were smart!";
+  else if(avgOutcome>=45)outcomeMsg="Mixed results — that's normal with draft randomness.";
+  else outcomeMsg="Tough breaks — even good process can lead to bad outcomes.";
+
+  let compareMsg='';
+  if(avgProcess>=65&&avgOutcome<45)compareMsg="Your process was strong, but outcomes were unlucky. This happens! Good GMs stick with good process even when luck is bad.";
+  else if(avgProcess<45&&avgOutcome>=65)compareMsg="You got lucky! Your outcomes were better than your process. But this won't work every time.";
+  else if(avgProcess>=60&&avgOutcome>=60)compareMsg="Good process AND good outcomes — the dream scenario! But remember, run this again and results might differ.";
+  else compareMsg="Both your process and outcomes were middling. Draft randomness makes this a very common result!";
+
+  $('scoreCards').innerHTML=`
+    <div class="score-card">
+      <div class="sc-value" style="color:${avgProcess>=65?'var(--success)':avgProcess>=45?'var(--warn)':'var(--danger)'}">${avgProcess}</div>
+      <div class="sc-label">Process Score</div>
+      <div class="sc-desc">${processMsg}</div>
+    </div>
+    <div class="score-card">
+      <div class="sc-value" style="color:${avgOutcome>=65?'var(--success)':avgOutcome>=45?'var(--warn)':'var(--danger)'}">${avgOutcome}</div>
+      <div class="sc-label">${showCareer?'Career':'Rookie'} Outcome Score</div>
+      <div class="sc-desc">${outcomeMsg}</div>
+    </div>`;
+  $('processExplain').innerHTML=`<strong>Process vs. Outcome:</strong> ${compareMsg}`;
+  $('picksRecap').innerHTML=recapHTML;
+  $('resultsDiscussion').style.display=G.teacherMode?'block':'none';
+}
+function resetDraft(){
+  G.picks=[];G.round=1;G.pick=1;G.selectedIdx=null;G.seasonsSimmed=false;
+  $('autoResults').innerHTML='';
+  showScreen('welcome');
+}
+
+// ============================================================
+// RUN 20 DRAFTS (AUTO MODE)
+// ============================================================
+function runAutoDrafts(){
+  let results=[];
+  for(let d=0;d<20;d++){
+    let tempPlayers=(G.draftClass==="modern"?MODERN_PLAYERS:HISTORICAL_PLAYERS).map(p=>({...p,cp:0}));
+    let tempDrafted=new Array(tempPlayers.length).fill(false);
+    let picks=[];
+    for(let r=0;r<G.totalRounds;r++){
+      // Simple AI: pick best available by tier then random
+      let avail=[];
+      tempPlayers.forEach((p,i)=>{if(!tempDrafted[i])avail.push(i)});
+      avail.sort((a,b)=>{
+        let ta='ABCD'.indexOf(tempPlayers[a].tier),tb='ABCD'.indexOf(tempPlayers[b].tier);
+        return ta-tb||(Math.random()-.5);
+      });
+      if(avail.length===0)break;
+      let pick=avail[0];
+      tempDrafted[pick]=true;
+      let probs=getProbs(tempPlayers[pick],G.scheme,0);
+      let career=simulateOutcome(probs);
+      picks.push({player:tempPlayers[pick],career,score:OUTCOME_SCORES[career]});
+    }
+    let avg=Math.round(picks.reduce((s,p)=>s+p.score,0)/picks.length);
+    results.push({picks,avg});
+  }
+  results.sort((a,b)=>b.avg-a.avg);
+  let html=`<h3 style="margin:20px 0 10px">20 Simulated Drafts (Same Strategy)</h3>
+    <p style="font-size:.85em;color:var(--muted);margin-bottom:12px">Notice how the <strong>same strategy</strong> produces <strong>different results</strong> each time? That's randomness!</p>`;
+
+  let scores=results.map(r=>r.avg);
+  let mean=Math.round(scores.reduce((a,b)=>a+b,0)/20);
+  let best=scores[0],worst=scores[scores.length-1];
+  html+=`<div class="exp-stats">
+    <div class="exp-stat"><div class="stat-val">${best}</div><div class="stat-label">Best Draft</div></div>
+    <div class="exp-stat"><div class="stat-val">${mean}</div><div class="stat-label">Average</div></div>
+    <div class="exp-stat"><div class="stat-val">${worst}</div><div class="stat-label">Worst Draft</div></div>
+  </div>`;
+  html+=`<div class="exp-conclusion">The best draft scored ${best} and the worst scored ${worst} — a spread of ${best-worst} points using the same approach! This shows that even with a good plan, luck plays a big role.</div>`;
+
+  results.forEach((r,i)=>{
+    let pickNames=r.picks.map(p=>`${p.player.name} (${OUTCOMES[p.career]})`).join(', ');
+    html+=`<details class="auto-run"><summary>Draft #${i+1} <span class="auto-score">${r.avg}</span></summary><p style="font-size:.8em;color:var(--muted);padding:8px">${pickNames}</p></details>`;
+  });
+  $('autoResults').innerHTML=html;
+}
+
+// ============================================================
+// EXPERIMENT MODE
+// ============================================================
+let expSelectedIdx=null;
+function renderExpPlayers(){
+  let posF=$('expPosFilter').value;
+  let players=G.draftClass==="modern"?MODERN_PLAYERS:HISTORICAL_PLAYERS;
+  let html='';
+  players.forEach((p,i)=>{
+    if(posF!=="ALL"&&p.pos!==posF)return;
+    let sel=expSelectedIdx===i;
+    html+=`<button class="exp-player-btn ${sel?'selected':''}" onclick="selectExpPlayer(${i})">${p.name} <span style="color:var(--muted);font-size:.75em">${p.pos} ${p.tier}</span></button>`;
+  });
+  $('expPlayerList').innerHTML=html;
+}
+function selectExpPlayer(idx){
+  expSelectedIdx=idx;
+  $('runExpBtn').disabled=false;
+  renderExpPlayers();
+}
+function runExperiment(){
+  if(expSelectedIdx===null)return;
+  let players=G.draftClass==="modern"?MODERN_PLAYERS:HISTORICAL_PLAYERS;
+  let p=players[expSelectedIdx];
+  let probs=getProbs(p,G.scheme,0);
+  let counts=[0,0,0,0,0];
+  let N=50;
+  for(let i=0;i<N;i++){
+    counts[simulateOutcome(probs)]++;
+  }
+  $('expPlayerName').textContent=`${p.name} (${p.pos}, Tier ${p.tier})`;
+  $('expResults').style.display='block';
+
+  // Histogram
+  let maxCount=Math.max(...counts,1);
+  let histHTML='';
+  for(let i=0;i<5;i++){
+    let h=Math.round(counts[i]/maxCount*180);
+    histHTML+=`<div class="hist-col">
+      <div class="hist-count" style="color:${OUTCOME_COLORS[i]}">${counts[i]}</div>
+      <div class="hist-bar" style="height:${h}px;background:${OUTCOME_COLORS[i]}"></div>
+      <div class="hist-label">${OUTCOMES[i]}</div>
+    </div>`;
+  }
+  $('histogram').innerHTML=histHTML;
+
+  // Stats
+  let ev=calcEV(probs);
+  let vol=calcVariance(probs);
+  // Actual outcome average from sim
+  let actualAvg=Math.round(counts.reduce((s,c,i)=>s+c*OUTCOME_SCORES[i],0)/N);
+  $('expStats').innerHTML=`
+    <div class="exp-stat"><div class="stat-val">${ev}</div><div class="stat-label">Expected Value</div></div>
+    <div class="exp-stat"><div class="stat-val">${actualAvg}</div><div class="stat-label">Actual Average (50 sims)</div></div>
+    <div class="exp-stat"><div class="stat-val">${vol}</div><div class="stat-label">Volatility</div></div>`;
+
+  let bustCount=counts[4];
+  let starCount=counts[0]+counts[1];
+  let concl='';
+  if(p.tier==='A'||p.tier==='B'){
+    concl=`Even though ${p.name} is a Tier ${p.tier} prospect, they busted ${bustCount} out of ${N} times (${bustCount*2}%). `;
+    if(starCount>0)concl+=`They became a star ${starCount} times (${starCount*2}%). `;
+    concl+=`No pick is a sure thing — that's what makes the draft so unpredictable!`;
+  } else {
+    concl=`${p.name} is a Tier ${p.tier} prospect — not the top of the board. But they still became a star ${starCount} times out of ${N} (${starCount*2}%)! `;
+    concl+=`Late-round gems are real. They also busted ${bustCount} times (${bustCount*2}%).`;
+  }
+  $('expConclusion').textContent=concl;
+
+  if(G.teacherMode){
+    $('expDiscussion').style.display='block';
+    $('expDiscussion').innerHTML=`<strong>Teacher Prompt:</strong> Have students each run this experiment for the same player. Compare class results. Did everyone get the same histogram? Why not? Connect to: <em>sample size, probability vs. certainty, and real-world randomness.</em>`;
+  } else {
+    $('expDiscussion').style.display='none';
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+renderExpPlayers();
+</script>
+</body>
+</html>
