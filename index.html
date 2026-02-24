@@ -193,6 +193,44 @@ button:active{transform:translateY(0)}
 .other-picks-box h4{color:var(--muted);font-size:.8em;text-transform:uppercase;margin-bottom:8px}
 .other-pick-line{font-size:.82em;color:var(--text);padding:3px 0;border-bottom:1px solid #333}
 .other-pick-line span{color:var(--muted)}
+
+/* Historical Reveal */
+.hist-reveal-box{background:var(--surface);border-radius:var(--radius);padding:20px;margin:20px 0}
+.hist-reveal-box h3{color:var(--gold);margin-bottom:4px}
+.hist-reveal-box .reveal-subtitle{color:var(--muted);font-size:.85em;margin-bottom:16px}
+.reveal-table{width:100%;border-collapse:collapse;font-size:.85em}
+.reveal-table th{color:var(--muted);font-size:.72em;text-transform:uppercase;letter-spacing:1px;padding:6px 10px;text-align:left;border-bottom:1px solid #333}
+.reveal-table td{padding:8px 10px;border-bottom:1px solid #222;vertical-align:middle}
+.reveal-table tr:last-child td{border-bottom:none}
+.reveal-hit{color:var(--success);font-weight:700}
+.reveal-miss{color:var(--danger);font-weight:700}
+.reveal-close{color:var(--warn);font-weight:700}
+.reveal-badge{display:inline-block;font-size:.7em;padding:2px 8px;border-radius:12px;font-weight:700}
+.reveal-surprise{background:var(--gold);color:#000}
+.reveal-gem{background:var(--success);color:#000}
+.reveal-bust-real{background:var(--danger);color:#fff}
+.sim-count-row{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
+.sim-count-row label{font-size:.82em;color:var(--muted)}
+.sim-count-btn{background:var(--card);color:var(--text);font-size:.8em;padding:6px 14px;border:2px solid transparent}
+.sim-count-btn.selected{border-color:var(--accent);color:var(--accent)}
+
+/* Strategy Tip */
+.strategy-tip{background:linear-gradient(135deg,#1a3040,#1a2340);border:1px solid var(--blue);border-radius:8px;padding:10px 14px;margin:10px 0;font-size:.82em;line-height:1.5}
+.strategy-tip .tip-label{font-size:.7em;text-transform:uppercase;letter-spacing:1px;color:var(--blue);font-weight:700;margin-bottom:4px}
+
+/* Mobile improvements */
+@media(max-width:600px){
+  #welcome{padding:20px 12px}
+  #welcome h1{font-size:1.6em}
+  .setup-grid{grid-template-columns:1fr}
+  .score-cards{grid-template-columns:1fr}
+  .exp-stats{grid-template-columns:1fr 1fr}
+  .draft-header{flex-direction:column;align-items:flex-start}
+  .meters{gap:8px}
+  .meter{min-width:90px}
+  .reveal-table{font-size:.75em}
+  .reveal-table th,.reveal-table td{padding:5px 6px}
+}
 </style>
 </head>
 <body>
@@ -350,7 +388,14 @@ button:active{transform:translateY(0)}
   </div>
   <div class="exp-player-select" id="expPlayerList"></div>
 
-  <button class="start-btn" id="runExpBtn" onclick="runExperiment()" disabled style="margin:16px 0;font-size:1em;padding:12px 32px">Simulate 50 Careers</button>
+  <div class="sim-count-row">
+    <label>Simulations:</label>
+    <button class="sim-count-btn" data-n="25" onclick="selectSimCount(25)">25</button>
+    <button class="sim-count-btn selected" data-n="50" onclick="selectSimCount(50)">50</button>
+    <button class="sim-count-btn" data-n="100" onclick="selectSimCount(100)">100</button>
+  </div>
+
+  <button class="start-btn" id="runExpBtn" onclick="runExperiment()" disabled style="margin:16px 0;font-size:1em;padding:12px 32px">Simulate Careers</button>
 
   <div id="expResults" style="display:none">
     <h3 style="margin-bottom:8px">Results for <span id="expPlayerName" style="color:var(--gold)"></span></h3>
@@ -368,7 +413,7 @@ button:active{transform:translateY(0)}
 <div class="screen" id="results-screen">
   <div class="results-header">
     <h1>Draft Complete!</h1>
-    <p style="color:var(--muted)">Let's see how your picks turned out...</p>
+    <p style="color:var(--muted)" id="resultsSubtitle">Let's see how your picks turned out...</p>
     <button class="btn-primary" onclick="simSeasons()" id="simBtn" style="margin:12px 0">Simulate 5 Seasons</button>
   </div>
   <div class="score-cards" id="scoreCards"></div>
@@ -397,6 +442,8 @@ button:active{transform:translateY(0)}
   <div class="discussion-prompt" id="resultsDiscussion" style="display:none">
     <strong>Teacher Discussion:</strong> Ask students: "If two GMs both make smart picks, can one still end up with a much worse team? Why?" Connect this to how randomness affects real-life decisions beyond football.
   </div>
+
+  <div id="histRevealSection"></div>
 
   <div id="claimSection"></div>
 
@@ -523,6 +570,62 @@ const HISTORICAL_PLAYERS=[
 
 const TEAM_NAMES=["Cardinals","Falcons","Ravens","Bills","Panthers","Bears","Bengals","Browns","Cowboys","Broncos","Lions","Packers","Texans","Colts","Jaguars","Chiefs","Raiders","Chargers","Rams","Dolphins","Vikings","Patriots","Saints","Giants","Jets","Eagles","Steelers","49ers","Seahawks","Titans","Commanders","Buccaneers"];
 
+// Real-life career outcomes for the 2018 draft class (outcome index: 0=All-Pro, 1=Pro Bowl, 2=Solid Starter, 3=Role Player, 4=Bust)
+const HISTORICAL_REAL_OUTCOMES={
+  "Baker Mayfield":     {outcome:2,note:"Started slow, revived career in Tampa Bay"},
+  "Sam Darnold":        {outcome:3,note:"Never lived up to #3 pick expectations"},
+  "Josh Allen":         {outcome:0,note:"Became an All-Pro superstar, multiple Pro Bowls"},
+  "Josh Rosen":         {outcome:4,note:"Multiple teams, washed out of league quickly"},
+  "Lamar Jackson":      {outcome:0,note:"Won 2 MVP awards — arguably best in the NFL"},
+  "Saquon Barkley":     {outcome:1,note:"Multiple Pro Bowls despite injury setbacks"},
+  "Rashaad Penny":      {outcome:4,note:"Never recovered from repeated injuries"},
+  "Nick Chubb":         {outcome:1,note:"Pro Bowl workhorse, one of NFL's best backs"},
+  "Calvin Ridley":      {outcome:1,note:"Pro Bowl receiver, missed year for suspension"},
+  "DJ Moore":           {outcome:2,note:"Consistent starter, finally shined with Chicago"},
+  "Courtland Sutton":   {outcome:2,note:"Solid starting receiver in Denver"},
+  "Hayden Hurst":       {outcome:3,note:"Never became a featured TE, rotational role"},
+  "Mike Gesicki":       {outcome:2,note:"Solid receiving TE, moved around the league"},
+  "Quenton Nelson":     {outcome:0,note:"Multiple All-Pro selections — elite guard"},
+  "Frank Ragnow":       {outcome:1,note:"Pro Bowl center, anchor of Detroit's line"},
+  "Mike McGlinchey":    {outcome:2,note:"Solid starter, never reached Pro Bowl level"},
+  "Kolton Miller":      {outcome:2,note:"Starter in Las Vegas, solid but unspectacular"},
+  "Connor Williams":    {outcome:3,note:"Journeyman lineman, never a true starter"},
+  "Bradley Chubb":      {outcome:1,note:"Pro Bowl pass rusher, injuries limited him"},
+  "Marcus Davenport":   {outcome:4,note:"Injury-plagued bust, never reached potential"},
+  "Harold Landry":      {outcome:2,note:"Solid starter in Tennessee, consistent contributor"},
+  "Arden Key":          {outcome:4,note:"Never developed, out of league after 4 years"},
+  "Vita Vea":           {outcome:1,note:"Pro Bowl nose tackle, defensive anchor in Tampa"},
+  "Da'Ron Payne":       {outcome:2,note:"Solid starter, got a big second contract"},
+  "Taven Bryan":        {outcome:4,note:"Never developed into starter, released early"},
+  "Denzel Ward":        {outcome:1,note:"Multiple Pro Bowls, elite corner in Cleveland"},
+  "Jaire Alexander":    {outcome:1,note:"Pro Bowl corner, elite in coverage"},
+  "Mike Hughes":        {outcome:4,note:"Injuries derailed promising career"},
+  "Josh Jackson":       {outcome:4,note:"Benched quickly, never made an impact"},
+  "Donte Jackson":      {outcome:2,note:"Solid starter, played for multiple teams"},
+  "Roquan Smith":       {outcome:0,note:"Multiple All-Pro LB — one of league's best"},
+  "Tremaine Edmunds":   {outcome:1,note:"Pro Bowl linebacker, got massive free agent deal"},
+  "Rashaan Evans":      {outcome:3,note:"Backup-level starter, never emerged as feature LB"},
+  "Leighton Vander Esch":{outcome:3,note:"Injuries derailed his career, never reached full potential"},
+  "Derwin James":       {outcome:0,note:"All-Pro safety — generational defensive back"},
+  "Minkah Fitzpatrick": {outcome:0,note:"All-Pro safety — traded to Pittsburgh, became elite"},
+  "Justin Reid":        {outcome:2,note:"Solid starter, signed big deal with Kansas City"},
+  "Jessie Bates III":   {outcome:1,note:"Pro Bowl safety, proved the scouts wrong"},
+  "Ronald Jones II":    {outcome:3,note:"Backup role, never seized starting job"},
+  "Sony Michel":        {outcome:3,note:"Super Bowl ring, but faded quickly after"},
+  "DJ Chark":           {outcome:2,note:"Flashed upside but injuries limited consistency"},
+  "Christian Kirk":     {outcome:2,note:"Reliable slot receiver, got paid in Jacksonville"},
+  "Anthony Miller":     {outcome:4,note:"Washed out quickly, never developed"},
+  "Dallas Goedert":     {outcome:1,note:"Emerged as Pro Bowl TE after Ertz left"},
+  "Mark Andrews":       {outcome:0,note:"All-Pro TE — one of the best ever at the position"},
+  "Isaiah Wynn":        {outcome:4,note:"Injuries destroyed what looked like a promising career"},
+  "Orlando Brown Jr.":  {outcome:1,note:"Pro Bowl tackle — massive underrated hit pick"},
+  "Fred Warner":        {outcome:0,note:"All-Pro LB — arguably biggest steal of the draft"},
+  "Darius Leonard":     {outcome:0,note:"All-Pro LB 3x — tiny school, became a star"},
+  "Sam Hubbard":        {outcome:2,note:"Solid starter in Cincinnati"},
+  "Lorenzo Carter":     {outcome:3,note:"Rotational end, never became a true starter"},
+  "Carlton Davis":      {outcome:2,note:"Solid corner starter, consistent contributor"},
+};
+
 // ============================================================
 // STATE
 // ============================================================
@@ -533,6 +636,7 @@ let G={
   fanHappy:50,jobSecurity:60,teacherMode:false,showMath:false,
   seasonsSimmed:false,claimGenerated:false
 };
+let SIM_COUNT=50;
 const OUTCOMES=["All-Pro","Pro Bowl","Solid Starter","Role Player","Bust"];
 const OUTCOME_SCORES={0:100,1:80,2:60,3:35,4:5};
 const OUTCOME_COLORS=["var(--gold)","var(--blue)","var(--success)","var(--muted)","var(--danger)"];
@@ -831,6 +935,22 @@ function showDetail(idx){
     </div>`;
   }
 
+  // Strategy tip based on player traits and team situation
+  let tip='';
+  let needVal=G.needs[p.pos]||0;
+  if(needVal>=2 && (p.traits.includes('Pro-Ready')||p.traits.includes('High Floor'))){
+    tip='Your team needs this position AND this player has a high floor — this pick addresses both need and reliability.';
+  } else if(needVal<=0 && p.tier==='A'){
+    tip='Your team doesn\'t need this position, but elite talent is always valuable. "Best player available" is a real strategy!';
+  } else if(p.traits.includes('Boom/Bust') && p.traits.includes('Injury Risk')){
+    tip='High risk + injury history = maximum variance. You could get an All-Pro or a bust. Are you comfortable with that uncertainty?';
+  } else if(p.traits.includes('Raw') && G.coachingPts>0){
+    tip=`You have ${G.coachingPts} development points left. Investing in this Raw prospect could boost their long-term ceiling!`;
+  } else if(p.tier==='C'){
+    tip='Tier C prospects are often overlooked — but late-round gems exist! Tom Brady went 199th. The question is: can you spot the upside?';
+  }
+  if(tip) html+=`<div class="strategy-tip"><div class="tip-label">Strategy Tip</div>${tip}</div>`;
+
   html+=`<button class="draft-btn" onclick="draftPlayer(${idx})">Draft ${p.name}</button>`;
   html+=`<button class="show-math-toggle" onclick="toggleMath()">${showMath?'Hide':'Show'} the Math</button>`;
 
@@ -935,8 +1055,10 @@ function closeDraftAnim(btn){
 function showResults(){
   showScreen('results-screen');
   $('simBtn').style.display='inline-block';
-  $('simBtn').textContent='Simulate 5 Seasons';
+  $('simBtn').textContent=G.draftClass==='historical'?'Simulate 5 Seasons & Reveal Real Outcomes':'Simulate 5 Seasons';
+  $('resultsSubtitle').textContent=G.draftClass==='historical'?'Simulate seasons to see your results — then we\'ll reveal what really happened to the 2018 class!':'Let\'s see how your picks turned out...';
   $('claimSection').innerHTML='';
+  $('histRevealSection').innerHTML='';
   G.claimGenerated=false;
   renderResults(false);
 }
@@ -944,6 +1066,7 @@ function simSeasons(){
   G.seasonsSimmed=true;
   $('simBtn').style.display='none';
   renderResults(true);
+  showHistoricalReveal();
   showClaimCode();
 }
 function renderResults(showCareer){
@@ -1057,9 +1180,61 @@ function runAutoDrafts(){
 }
 
 // ============================================================
+// HISTORICAL REVEAL
+// ============================================================
+function showHistoricalReveal(){
+  if(G.draftClass!=='historical') return;
+  let html=`<div class="hist-reveal-box">
+    <h3>What Actually Happened — 2018 Draft Class</h3>
+    <p class="reveal-subtitle">Here's what real NFL careers looked like for the players in this draft class. How close was your simulation?</p>
+    <table class="reveal-table">
+      <thead><tr>
+        <th>Player</th><th>Your Sim</th><th>Real Life</th><th>Match?</th><th>Fun Fact</th>
+      </tr></thead><tbody>`;
+  G.picks.forEach(pk=>{
+    let realData=HISTORICAL_REAL_OUTCOMES[pk.player.name];
+    if(!realData) return;
+    let simOutcome=OUTCOMES[pk.careerResult];
+    let realOutcome=OUTCOMES[realData.outcome];
+    let diff=Math.abs(pk.careerResult-realData.outcome);
+    let matchCls,matchTxt,badge='';
+    if(diff===0){matchCls='reveal-hit';matchTxt='Exact match!';badge='<span class="reveal-badge" style="background:var(--accent);color:#000">Matched</span>';}
+    else if(diff===1){matchCls='reveal-close';matchTxt='Close';}
+    else if(diff>=2){matchCls='reveal-miss';matchTxt='Way off';}
+    // Surprise badges
+    if(pk.player.tier==='B'&&realData.outcome===0) badge=`<span class="reveal-badge reveal-gem">Hidden Gem!</span>`;
+    else if(pk.player.tier==='A'&&realData.outcome===4) badge=`<span class="reveal-badge reveal-bust-real">Bust!</span>`;
+    else if(pk.player.tier==='C'&&realData.outcome<=1) badge=`<span class="reveal-badge reveal-surprise">Underdog Star!</span>`;
+    html+=`<tr>
+      <td><strong>${pk.player.name}</strong> <span style="color:var(--muted);font-size:.8em">${pk.player.pos}</span></td>
+      <td style="color:${OUTCOME_COLORS[pk.careerResult]}">${simOutcome}</td>
+      <td style="color:${OUTCOME_COLORS[realData.outcome]}">${realOutcome}</td>
+      <td class="${matchCls}">${matchTxt} ${badge}</td>
+      <td style="color:var(--muted);font-size:.78em">${realData.note}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table>
+  <div class="exp-conclusion" style="margin-top:16px">
+    <strong>The Big Lesson:</strong> Even with the best scouting, real NFL careers are full of surprises.
+    Josh Allen was considered a "raw boom/bust" — he became an All-Pro MVP. Arden Key looked like a high-upside pass rusher — he washed out quickly.
+    <em>The draft isn't a ranking. It's a chance at a player.</em>
+  </div>
+  </div>`;
+  $('histRevealSection').innerHTML=html;
+}
+
+// ============================================================
 // EXPERIMENT MODE
 // ============================================================
 let expSelectedIdx=null;
+function selectSimCount(n){
+  SIM_COUNT=n;
+  document.querySelectorAll('.sim-count-btn').forEach(btn=>{
+    btn.classList.toggle('selected',parseInt(btn.dataset.n)===n);
+  });
+  let runBtn=$('runExpBtn');
+  if(runBtn) runBtn.textContent=`Simulate ${n} Careers`;
+}
 function renderExpPlayers(){
   let posF=$('expPosFilter').value;
   let players=G.draftClass==="modern"?MODERN_PLAYERS:HISTORICAL_PLAYERS;
@@ -1082,7 +1257,7 @@ function runExperiment(){
   let p=players[expSelectedIdx];
   let probs=getProbs(p, 0);
   let counts=[0,0,0,0,0];
-  let N=50;
+  let N=SIM_COUNT;
   for(let i=0;i<N;i++) counts[simulateOutcome(probs)]++;
 
   $('expPlayerName').textContent=`${p.name} (${p.pos}, Tier ${p.tier})`;
@@ -1092,8 +1267,9 @@ function runExperiment(){
   let histHTML='';
   for(let i=0;i<5;i++){
     let h=Math.round(counts[i]/maxCount*180);
+    let pct=Math.round(counts[i]/N*100);
     histHTML+=`<div class="hist-col">
-      <div class="hist-count" style="color:${OUTCOME_COLORS[i]}">${counts[i]}</div>
+      <div class="hist-count" style="color:${OUTCOME_COLORS[i]}">${counts[i]}<span style="font-size:.65em;color:var(--muted)"> (${pct}%)</span></div>
       <div class="hist-bar" style="height:${h}px;background:${OUTCOME_COLORS[i]}"></div>
       <div class="hist-label">${OUTCOMES[i]}</div>
     </div>`;
@@ -1103,27 +1279,36 @@ function runExperiment(){
   let ev=calcEV(probs);
   let vol=calcVariance(probs);
   let actualAvg=Math.round(counts.reduce((s,c,i)=>s+c*OUTCOME_SCORES[i],0)/N);
+  let convergenceNote=N>=100?`<div style="font-size:.72em;color:var(--muted);margin-top:4px">With ${N} sims, the actual avg gets closer to the Expected Value — that's the Law of Large Numbers!</div>`:'';
   $('expStats').innerHTML=`
     <div class="exp-stat"><div class="stat-val">${ev}</div><div class="stat-label">Expected Value</div></div>
-    <div class="exp-stat"><div class="stat-val">${actualAvg}</div><div class="stat-label">Actual Average (50 sims)</div></div>
+    <div class="exp-stat"><div class="stat-val">${actualAvg}</div><div class="stat-label">Actual Avg (${N} sims)</div>${convergenceNote}</div>
     <div class="exp-stat"><div class="stat-val">${vol}</div><div class="stat-label">Volatility</div></div>`;
+
+  // Historical real-life note
+  let histNote='';
+  if(G.draftClass==='historical'){
+    let real=HISTORICAL_REAL_OUTCOMES[p.name];
+    if(real) histNote=`<div class="strategy-tip" style="margin-top:12px"><div class="tip-label">What Actually Happened</div>${p.name}: ${real.note} (Real outcome: <strong style="color:${OUTCOME_COLORS[real.outcome]}">${OUTCOMES[real.outcome]}</strong>)</div>`;
+  }
 
   let bustCount=counts[4];
   let starCount=counts[0]+counts[1];
   let concl='';
   if(p.tier==='A'||p.tier==='B'){
-    concl=`Even though ${p.name} is a Tier ${p.tier} prospect, they busted in ${bustCount} out of ${N} simulations (${bustCount*2}%). `;
-    if(starCount>0) concl+=`They became a star ${starCount} times (${starCount*2}%). `;
+    concl=`Even though ${p.name} is a Tier ${p.tier} prospect, they busted in ${bustCount} out of ${N} simulations (${Math.round(bustCount/N*100)}%). `;
+    if(starCount>0) concl+=`They became a star ${starCount} times (${Math.round(starCount/N*100)}%). `;
     concl+=`That's the whole lesson: a draft pick is a CHANCE at a player, not a guarantee. The draft isn't a ranking!`;
   } else {
-    concl=`${p.name} is a Tier ${p.tier} prospect — not the top of the board. But they still became a star ${starCount} times out of ${N} (${starCount*2}%)! `;
-    concl+=`Late-round gems are real — think Tom Brady at pick 199. They also busted ${bustCount} times (${bustCount*2}%). That's randomness.`;
+    concl=`${p.name} is a Tier ${p.tier} prospect — not the top of the board. But they still became a star ${starCount} times out of ${N} (${Math.round(starCount/N*100)}%)! `;
+    concl+=`Late-round gems are real — think Tom Brady at pick 199. They also busted ${bustCount} times (${Math.round(bustCount/N*100)}%). That's randomness.`;
   }
   $('expConclusion').textContent=concl;
+  if(histNote) $('expConclusion').insertAdjacentHTML('afterend',histNote);
 
   if(G.teacherMode){
     $('expDiscussion').style.display='block';
-    $('expDiscussion').innerHTML=`<strong>Teacher Prompt:</strong> Have each student run this experiment for the same player. Compare class results — did everyone get the same chart? Why not? Connect to: <em>"A draft pick is a chance at a player, not the player themselves."</em>`;
+    $('expDiscussion').innerHTML=`<strong>Teacher Prompt:</strong> Have each student run this experiment for the same player. Compare class results — did everyone get the same chart? Why not? Try switching between 25 and 100 simulations — notice how the chart shape changes! Connect to: <em>"A draft pick is a chance at a player, not the player themselves."</em>`;
   } else {
     $('expDiscussion').style.display='none';
   }
