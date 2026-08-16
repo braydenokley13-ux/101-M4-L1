@@ -44,7 +44,7 @@ button:active{transform:translateY(0)}
 
 /* DRAFT SCREEN */
 #draft-screen{padding:10px}
-.draft-header{background:var(--surface);border-radius:var(--radius);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.draft-header{background:var(--surface);border-radius:var(--radius);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;scroll-margin-top:60px}
 .draft-header .round-info{font-size:1.3em;font-weight:700}
 .draft-header .round-info span{color:var(--accent)}
 .meters{display:flex;gap:16px;flex-wrap:wrap}
@@ -162,17 +162,32 @@ button:active{transform:translateY(0)}
 .teacher-banner{background:linear-gradient(90deg,#7b2d8b,#5c2d8b);color:#fff;text-align:center;padding:8px;font-size:.8em;font-weight:600}
 .discussion-prompt{background:#2d1a4e;border-left:4px solid var(--purple);border-radius:8px;padding:12px;margin:10px 0;font-size:.85em;color:#e0d0ff;line-height:1.5}
 .toggle-row{display:flex;align-items:center;gap:10px;margin:10px 0}
-.toggle{position:relative;width:44px;height:24px;background:#444;border-radius:12px;cursor:pointer;transition:background .3s}
+.toggle{position:relative;width:44px;height:24px;background:#444;border-radius:12px;cursor:pointer;transition:background .3s;padding:0;border:none;flex:none;display:inline-block;vertical-align:middle}
 .toggle.on{background:var(--accent)}
+.toggle:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .3s}
 .toggle.on::after{left:22px}
 .toggle-label{font-size:.85em;color:var(--muted)}
 
 /* Nav */
-.nav-bar{background:var(--surface);display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid #333;position:sticky;top:0;z-index:100}
-.nav-bar .logo{font-weight:800;font-size:.95em;color:var(--accent)}
-.nav-btns{display:flex;gap:8px;align-items:center}
-.nav-btns button{background:var(--card);color:var(--text);font-size:.78em;padding:6px 14px}
+.nav-bar{background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid #333;position:sticky;top:0;z-index:100}
+.nav-bar .logo{font-weight:800;font-size:.95em;color:var(--accent);white-space:nowrap}
+.nav-btns{display:flex;gap:8px;align-items:center;flex:none}
+.nav-btns>button{background:var(--card);color:var(--text);font-size:.78em;padding:6px 14px}
+.logo-short{display:none}
+
+/* On a phone the bar used to wrap the module name onto three lines, which made
+   it 89px tall, pushed "Teacher" off the right edge, and hid the round header
+   and the team-need badges underneath it. Shortening the label and dropping the
+   toggle's text keeps the bar on one line, so nothing is covered. */
+@media(max-width:560px){
+  .nav-bar{padding:6px 10px;gap:6px}
+  .logo-long{display:none}
+  .logo-short{display:inline}
+  .nav-btns{gap:6px}
+  .nav-btns>button{padding:8px 10px;font-size:.72em}
+  .nav-bar .toggle-label{display:none}
+}
 
 /* Needs */
 .needs-row{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
@@ -198,13 +213,14 @@ button:active{transform:translateY(0)}
 <body>
 
 <nav class="nav-bar" id="navbar">
-  <div class="logo">MODULE 4 — LESSON 1</div>
+  <div class="logo"><span class="logo-long">MODULE 4 — LESSON 1</span><span class="logo-short">M4 · L1</span></div>
   <div class="nav-btns">
     <button onclick="showScreen('welcome')">Home</button>
     <button onclick="showScreen('experiment-screen')">Experiment</button>
     <div class="toggle-row" style="margin:0">
-      <div class="toggle" id="teacherToggle" onclick="toggleTeacher()"></div>
-      <span class="toggle-label">Teacher</span>
+      <button type="button" class="toggle" id="teacherToggle" onclick="toggleTeacher()"
+              aria-pressed="false" aria-label="Teacher mode — show the probability maths"></button>
+      <span class="toggle-label" aria-hidden="true">Teacher</span>
     </div>
   </div>
 </nav>
@@ -643,6 +659,12 @@ function $(id){return document.getElementById(id)}
 function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   $(id).classList.add('active');
+  // Screens swap in place, so without this the new one inherits the old one's
+  // scroll position. Starting the draft from the bottom of a long welcome page
+  // opened the board already scrolled past its own header, leaving the round
+  // number and the team-need badges sitting underneath the sticky nav bar —
+  // which read as the nav overlapping the page rather than as lost scroll.
+  window.scrollTo(0, 0);
 }
 function selectClass(c){
   G.draftClass=c;
@@ -659,6 +681,7 @@ function selectRounds(n){
 function toggleTeacher(){
   G.teacherMode=!G.teacherMode;
   $('teacherToggle').classList.toggle('on',G.teacherMode);
+  $('teacherToggle').setAttribute('aria-pressed', String(G.teacherMode));
   $('teacherBanner').style.display=G.teacherMode?'block':'none';
   if(G.teacherMode)G.showMath=true;
   renderBoard();
